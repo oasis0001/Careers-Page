@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Brain — Animated ASCII Dither</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg-main: #050505;
+            --bg-panel: #111113;
+            --border: #222225;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #ffffff;
+            --text-muted: #888890;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #controls {
+            width: 320px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            gap: 20px;
+            overflow-y: auto;
+            box-shadow: 5px 0 25px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        #controls::-webkit-scrollbar { width: 6px; }
+        #controls::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+        h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .val-display { color: var(--text-main); }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #2a2a2a;
+            border-radius: 3px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        select, input[type="color"] {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1a1a1c;
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 6px;
+            outline: none;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        input[type="color"] {
+            height: 40px;
+            padding: 2px 4px;
+        }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #111 0%, #000 100%);
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            max-width: 95%;
+            max-height: 95%;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        .section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            margin: 4px 0 -4px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+        .section-title:first-of-type {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        #status {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 16px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #333;
+            color: #fff;
+            font-size: 13px;
+            border-radius: 6px;
+            z-index: 20;
+            max-width: 80%;
+            text-align: center;
+            pointer-events: none;
+        }
+        #status.error { border-color: #c0392b; color: #ff8a80; }
+        #status.ok    { display: none; }
+        #status code  {
+            background: #222;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #ffd54f;
+        }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <h2>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Dither Studio — Brain
+    </h2>
+
+    <div class="section-title">Dither</div>
+
+    <div class="control-group">
+        <div class="control-header"><span>Character Set</span></div>
+        <select id="charset">
+            <option value="blocks">Block Pixels (█ ▓ ▒ ░)</option>
+            <option value="ascii" selected>Standard ASCII (Ñ@#...)</option>
+            <option value="binary">Binary (1 0)</option>
+            <option value="minimal">Minimal (+ - .)</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+        <div class="control-header"><span>Tint Color</span></div>
+        <input type="color" id="tintColor" value="#1a56ff">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Grid Resolution</span>
+            <span id="resolutionVal" class="val-display">6</span>
+        </div>
+        <input type="range" id="resolution" min="2" max="25" value="6">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Contrast</span>
+            <span id="contrastVal" class="val-display">1.1</span>
+        </div>
+        <input type="range" id="contrast" min="0.5" max="3.0" step="0.1" value="1.1">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Brightness Threshold</span>
+            <span id="thresholdVal" class="val-display">1.7</span>
+        </div>
+        <input type="range" id="threshold" min="0.1" max="2.0" step="0.1" value="1.7">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Shadow Brightness</span>
+            <span id="shadowLiftVal" class="val-display">49</span>
+        </div>
+        <input type="range" id="shadowLift" min="0" max="200" value="49">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Animated Noise</span>
+            <span id="noiseVal" class="val-display">132</span>
+        </div>
+        <input type="range" id="noise" min="0" max="150" value="132">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Animation Speed (FPS)</span>
+            <span id="fpsVal" class="val-display">35</span>
+        </div>
+        <input type="range" id="fps" min="1" max="60" value="35">
+    </div>
+
+    <div class="section-title">3D Model</div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Rotation Speed Y</span>
+            <span id="rotYVal" class="val-display">1.0</span>
+        </div>
+        <input type="range" id="rotY" min="-3" max="3" step="0.1" value="1.0">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Rotation Speed X</span>
+            <span id="rotXVal" class="val-display">0.0</span>
+        </div>
+        <input type="range" id="rotX" min="-3" max="3" step="0.1" value="0">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Tilt X</span>
+            <span id="tiltXVal" class="val-display">-0.2</span>
+        </div>
+        <input type="range" id="tiltX" min="-1.5" max="1.5" step="0.05" value="-0.2">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Camera Zoom</span>
+            <span id="zoomVal" class="val-display">1.4</span>
+        </div>
+        <input type="range" id="zoom" min="0.6" max="3.0" step="0.05" value="1.4">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header"><span>Model Color</span></div>
+        <input type="color" id="modelColor" value="#3050ff">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Key Light Intensity</span>
+            <span id="keyVal" class="val-display">1.8</span>
+        </div>
+        <input type="range" id="keyIntensity" min="0" max="4" step="0.1" value="1.8">
+    </div>
+</div>
+
+<div id="canvas-container">
+    <div id="status">Initializing…</div>
+    <canvas id="displayCanvas"></canvas>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // --- DOM ---
+    const displayCanvas = document.getElementById('displayCanvas');
+    const ctx = displayCanvas.getContext('2d', { alpha: false });
+    const statusEl = document.getElementById('status');
+
+    function setStatus(msg, kind = '') {
+        statusEl.innerHTML = msg;
+        statusEl.className = kind;
+    }
+
+    // file:// blocks fetch(), so the GLB loader will fail. Warn early.
+    if (location.protocol === 'file:') {
+        setStatus(
+            'Open this page via a local server, not <code>file://</code>.<br>' +
+            'Run <code>python3 -m http.server</code> in this folder, then visit ' +
+            '<code>http://localhost:8000/dither_brain.html</code>.',
+            'error'
+        );
+    } else {
+        setStatus('Loading 3D model…');
+    }
+
+    // Offscreen 2D canvas — bridges Three.js output into the ASCII sampler
+    const offscreenCanvas = document.createElement('canvas');
+    const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+
+    // --- ASCII charsets ---
+    const charSets = {
+        ascii:   "Ñ@#W$9876543210?!abc;:+=-,._ ",
+        blocks:  "█▓▒░ ",
+        binary:  "10 ",
+        minimal: "#*+-. "
+    };
+
+    // --- UI inputs ---
+    const inputs = {
+        resolution:   document.getElementById('resolution'),
+        noise:        document.getElementById('noise'),
+        fps:          document.getElementById('fps'),
+        threshold:    document.getElementById('threshold'),
+        contrast:     document.getElementById('contrast'),
+        shadowLift:   document.getElementById('shadowLift'),
+        charset:      document.getElementById('charset'),
+        tintColor:    document.getElementById('tintColor'),
+        rotY:         document.getElementById('rotY'),
+        rotX:         document.getElementById('rotX'),
+        tiltX:        document.getElementById('tiltX'),
+        zoom:         document.getElementById('zoom'),
+        modelColor:   document.getElementById('modelColor'),
+        keyIntensity: document.getElementById('keyIntensity'),
+    };
+
+    ['resolution', 'noise', 'fps', 'threshold', 'contrast', 'shadowLift',
+     'rotY', 'rotX', 'tiltX', 'zoom', 'keyIntensity'].forEach(key => {
+        inputs[key].addEventListener('input', (e) => {
+            document.getElementById(`${key}Val`).innerText = e.target.value;
+        });
+    });
+
+    // --- Three.js setup ---
+    const threeCanvas = document.createElement('canvas');
+    const renderer = new THREE.WebGLRenderer({
+        canvas: threeCanvas,
+        alpha: true,
+        antialias: true,
+        preserveDrawingBuffer: true
+    });
+    renderer.setPixelRatio(1); // dither doesn't benefit from higher DPR
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    camera.position.set(0, 0, 3);
+
+    // Lighting — strong key + cool fill + small ambient → studio look like David
+    const ambient = new THREE.AmbientLight(0xffffff, 0.18);
+    scene.add(ambient);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    keyLight.position.set(3, 4, 5);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x6080ff, 0.45);
+    fillLight.position.set(-3, -1, 2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    rimLight.position.set(-1, 2, -3);
+    scene.add(rimLight);
+
+    // Group wraps the brain so rotation pivots around its geometric center
+    const brainGroup = new THREE.Group();
+    scene.add(brainGroup);
+
+    let brainModel = null;
+    let baseDistance = 3;
+    let isBrainLoaded = false;
+    let currentModelColor = inputs.modelColor.value;
+
+    function applyModelColor(hex) {
+        if (!brainModel) return;
+        const color = new THREE.Color(hex);
+        brainModel.traverse(node => {
+            if (node.isMesh && node.material) {
+                // single material assumed; if it's an array, set on each
+                const mats = Array.isArray(node.material) ? node.material : [node.material];
+                mats.forEach(m => {
+                    if (m.color) m.color.copy(color);
+                });
+            }
+        });
+    }
+
+    inputs.modelColor.addEventListener('input', (e) => {
+        currentModelColor = e.target.value;
+        applyModelColor(currentModelColor);
+    });
+
+    inputs.keyIntensity.addEventListener('input', (e) => {
+        keyLight.intensity = parseFloat(e.target.value);
+    });
+
+    new GLTFLoader().load(
+        'Brain.glb',
+        (gltf) => {
+            brainModel = gltf.scene;
+
+            // give every mesh a clean lit material so we control look uniformly
+            brainModel.traverse(node => {
+                if (node.isMesh) {
+                    node.material = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(currentModelColor),
+                        roughness: 0.55,
+                        metalness: 0.05
+                    });
+                }
+            });
+
+            // center and frame
+            const box = new THREE.Box3().setFromObject(brainModel);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+            brainModel.position.sub(center);
+
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fovRad = (camera.fov * Math.PI) / 180;
+            baseDistance = (maxDim / (2 * Math.tan(fovRad / 2)));
+
+            brainGroup.add(brainModel);
+            isBrainLoaded = true;
+            setStatus('', 'ok');
+        },
+        (xhr) => {
+            if (xhr.lengthComputable) {
+                const pct = Math.round((xhr.loaded / xhr.total) * 100);
+                setStatus(`Loading 3D model… ${pct}%`);
+            }
+        },
+        (err) => {
+            console.error('Failed to load Brain.glb:', err);
+            setStatus(
+                'Failed to load <code>Brain.glb</code>.<br>' +
+                'Make sure the file is in the same folder and the page is served via HTTP.<br>' +
+                'Check the browser console for details.',
+                'error'
+            );
+        }
+    );
+
+    // --- Canvas sizing ---
+    function resizeCanvases() {
+        const container = document.getElementById('canvas-container');
+        const maxWidth = container.clientWidth - 40;
+        const maxHeight = container.clientHeight - 40;
+
+        // square-ish viewport that fits the container
+        const side = Math.max(200, Math.min(maxWidth, maxHeight));
+        const w = Math.floor(side);
+        const h = Math.floor(side);
+
+        displayCanvas.width = w;
+        displayCanvas.height = h;
+        offscreenCanvas.width = w;
+        offscreenCanvas.height = h;
+
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases();
+
+    // --- Helpers ---
+    function hexToRgb(hex) {
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return m ? { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) }
+                 : { r: 255, g: 255, b: 255 };
+    }
+
+    // --- Main loop ---
+    let lastDrawTime = performance.now();
+    let lastFrameTime = performance.now();
+
+    function loop(now) {
+        requestAnimationFrame(loop);
+
+        const dt = Math.min(0.1, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+
+        const fps = parseInt(inputs.fps.value);
+        const interval = 1000 / fps;
+        if (now - lastDrawTime < interval) return;
+        lastDrawTime = now;
+
+        // 1. update rotation and tilt
+        if (isBrainLoaded) {
+            const rotY = parseFloat(inputs.rotY.value);
+            const rotX = parseFloat(inputs.rotX.value);
+            brainGroup.rotation.y += rotY * dt;
+            brainGroup.rotation.x += rotX * dt;
+            // tilt is an absolute offset on top of the spinning; apply via brainModel
+            // to keep brainGroup's rotation pure
+            brainModel.rotation.x = parseFloat(inputs.tiltX.value);
+        }
+
+        // 2. camera zoom
+        const zoom = parseFloat(inputs.zoom.value);
+        camera.position.z = baseDistance * zoom;
+        camera.lookAt(0, 0, 0);
+
+        // 3. render three.js
+        if (isBrainLoaded) {
+            renderer.render(scene, camera);
+        }
+
+        // 4. copy three's output to the 2D offscreen so we can sample pixels
+        offCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        if (isBrainLoaded) {
+            offCtx.drawImage(threeCanvas, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        }
+
+        // 5. run ASCII dither over the offscreen image
+        drawDither();
+    }
+
+    function drawDither() {
+        const res = parseInt(inputs.resolution.value);
+        const noiseLvl = parseInt(inputs.noise.value);
+        const thresh = parseFloat(inputs.threshold.value);
+        const contrast = parseFloat(inputs.contrast.value);
+        const shadowLift = parseInt(inputs.shadowLift.value);
+        const density = charSets[inputs.charset.value];
+        const tint = hexToRgb(inputs.tintColor.value);
+
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, displayCanvas.width, displayCanvas.height);
+
+        ctx.font = `bold ${res}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        if (!isBrainLoaded) return;
+
+        const imgData = offCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        const pixels = imgData.data;
+
+        for (let y = 0; y < displayCanvas.height; y += res) {
+            for (let x = 0; x < displayCanvas.width; x += res) {
+                const index = (y * displayCanvas.width + x) * 4;
+
+                const r = pixels[index];
+                const g = pixels[index + 1];
+                const b = pixels[index + 2];
+                const a = pixels[index + 3];
+
+                // skip transparent pixels — keep the dither inside the model silhouette
+                if (a < 128) continue;
+
+                let brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+                brightness = ((brightness / 255 - 0.5) * contrast + 0.5) * 255;
+                brightness = brightness + shadowLift * (1 - Math.max(0, Math.min(255, brightness)) / 255);
+
+                const noise = (Math.random() - 0.5) * noiseLvl;
+                brightness = (brightness * thresh) + noise;
+                brightness = Math.max(0, Math.min(255, brightness));
+
+                if (brightness < 10) continue;
+
+                const charIndex = Math.floor((1 - brightness / 255) * (density.length - 1));
+                const char = density[charIndex];
+
+                const intensity = brightness / 255;
+                ctx.fillStyle = `rgb(${tint.r * intensity}, ${tint.g * intensity}, ${tint.b * intensity})`;
+                ctx.fillText(char, x + res / 2, y + res / 2);
+            }
+        }
+    }
+
+    requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>

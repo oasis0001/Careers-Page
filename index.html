@@ -199,6 +199,8 @@
   .feature.active .box {
     opacity: 1;
     transform: scale(1);
+    pointer-events: auto;
+    cursor: pointer;
   }
   .feature.active .dot {
     opacity: 1;
@@ -249,6 +251,58 @@
     text-transform: uppercase;
     z-index: 4;
     pointer-events: none;
+  }
+
+  /* === Brain overlay (3D inside-the-mind scene) === */
+  #brain-overlay {
+    position: absolute;
+    inset: 0;
+    background: #010103;
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  #brain-overlay.inside-brain {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #brain3DCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  /* Blurry vignette around the viewport edges while inside the 3D world */
+  .brain-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(ellipse 78% 76% at 50% 50%,
+      transparent 48%,
+      rgba(1, 1, 3, 0.45) 74%,
+      rgba(1, 1, 3, 0.92) 100%);
+  }
+  .brain-vignette::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    -webkit-mask-image: radial-gradient(ellipse 70% 68% at 50% 50%, transparent 54%, #000 86%);
+            mask-image: radial-gradient(ellipse 70% 68% at 50% 50%, transparent 54%, #000 86%);
+  }
+  .btn-close-brain {
+    background: rgba(1, 1, 3, 0.4);
+    transition: color 220ms ease, border-color 220ms ease, background 220ms ease;
+    z-index: 2;
+    text-transform: uppercase;
+    user-select: none;
+  }
+  .btn-close-brain:hover {
+    color: var(--text) !important;
+    border-color: rgba(255, 255, 255, 0.45) !important;
+    background: rgba(26, 86, 255, 0.08);
   }
 </style>
 </head>
@@ -330,10 +384,25 @@
     <div class="hover-zone" data-target="eye"   style="left:668px; top:228px; width:90px;  height:82px;"></div>
     <div class="hover-zone" data-target="mouth" style="left:610px; top:363px; width:104px; height:50px;"></div>
 
-    <div class="hint">Hover the head · eye · mouth</div>
+    <div class="hint">Hover the head · eye · mouth · click HEAD to enter</div>
+
+    <!-- ===== 3D "Inside the Brain" overlay ===== -->
+    <div id="brain-overlay">
+      <canvas id="brain3DCanvas"></canvas>
+      <div class="brain-vignette"></div>
+      <div class="btn-close-brain" style="position: absolute; top: 30px; right: 40px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); cursor: pointer; border: 1px solid rgba(255,255,255,0.15); padding: 8px 16px; letter-spacing: 1px;">[ ESCAPE_MIND ]</div>
+    </div>
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FontLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/TextGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script>
   // === Animated ASCII Dither — renders the man's head onto #statueCanvas ===
   (function () {
@@ -434,19 +503,477 @@
     fit();
   })();
 
-  // Hover interactions — toggle .active on the matching feature
+  // === Three.js "Inside the Brain" — shatter-dive into wireframe typography void ===
+  // Exposes { open, close, isOpen } for the hover/click handler below.
+  const brain = (function () {
+    if (typeof THREE === 'undefined' || typeof gsap === 'undefined') {
+      console.warn('[brain] missing THREE or gsap dependency');
+      return { open: () => {}, close: () => {}, isOpen: () => false };
+    }
+
+    const overlay      = document.getElementById('brain-overlay');
+    const canvas       = document.getElementById('brain3DCanvas');
+    const closeBtn     = document.querySelector('.btn-close-brain');
+    const statueCanvas = document.getElementById('statueCanvas');
+
+    const W = 1440, H = 750;
+    const CAM_HOME_Z   = 600;     // where camera starts (frames the shatter wall)
+    const CAM_INSIDE_Z = -1800;   // where camera lands inside the void
+    const WALL_Z       = 0;       // shatter wall's plane
+
+    const FOV_HOME = 60;
+    const FOV_DIVE = 92;          // fish-eye punch at the peak of the dive
+
+    // ---- Renderer / Scene / Camera ----
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    renderer.setSize(W, H, false);
+    renderer.setClearColor(0x010103, 1);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x010103);
+    scene.fog = new THREE.Fog(0x010103, 1400, 5200);
+
+    const camera = new THREE.PerspectiveCamera(FOV_HOME, W / H, 0.1, 10000);
+    camera.position.set(0, 0, CAM_HOME_Z);
+
+    // ---- POST: radial (zoom) blur + chromatic aberration, driven by uStrength ----
+    // uStrength 0 = clean passthrough; ramped up by GSAP for the warp-speed dive.
+    const RadialBlurCAShader = {
+      uniforms: {
+        tDiffuse:  { value: null },
+        uStrength: { value: 0.0 },
+        uCenter:   { value: new THREE.Vector2(0.5, 0.5) },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float uStrength;
+        uniform vec2 uCenter;
+        varying vec2 vUv;
+        void main() {
+          vec2 toCenter = uCenter - vUv;          // march direction (toward center)
+          vec2 fromCenter = vUv - uCenter;        // chromatic offset direction
+          vec4 col = vec4(0.0);
+          float total = 0.0;
+          float ca = uStrength * 0.018;           // chromatic aberration amount
+          const int N = 18;
+          for (int i = 0; i < N; i++) {
+            float t = float(i) / float(N - 1);    // 0..1
+            float scale = t * uStrength * 0.55;   // how far this sample marches inward
+            vec2 base = vUv + toCenter * scale;
+            float r = texture2D(tDiffuse, base + fromCenter * ca).r;
+            float g = texture2D(tDiffuse, base).g;
+            float b = texture2D(tDiffuse, base - fromCenter * ca).b;
+            float w = 1.0 - t * 0.55;             // weight nearer samples a touch more
+            col += vec4(r, g, b, 1.0) * w;
+            total += w;
+          }
+          gl_FragColor = col / total;
+        }
+      `,
+    };
+
+    let composer = null, blurPass = null;
+    if (THREE.EffectComposer && THREE.RenderPass && THREE.ShaderPass) {
+      composer = new THREE.EffectComposer(renderer);
+      composer.setSize(W, H);
+      composer.addPass(new THREE.RenderPass(scene, camera));
+      blurPass = new THREE.ShaderPass(RadialBlurCAShader);
+      blurPass.renderToScreen = true;
+      composer.addPass(blurPass);
+    }
+    function setBlur(v) { if (blurPass) blurPass.uniforms.uStrength.value = v; }
+
+    // ---- THE VOID: multi-axis architectural grids (faint blue) ----
+    const GRID_MAIN = 0x1a56ff;
+    const GRID_SUB  = 0x16265a;
+    function gridLayer(size, divisions, opacity, position, rotation) {
+      const g = new THREE.GridHelper(size, divisions, GRID_MAIN, GRID_SUB);
+      g.material.transparent = true;
+      g.material.opacity = opacity;
+      g.material.depthWrite = false;
+      if (position) g.position.copy(position);
+      if (rotation) g.rotation.copy(rotation);
+      return g;
+    }
+    // Floor + ceiling (default GridHelper lies on XZ plane)
+    scene.add(gridLayer(10000, 100, 0.30, new THREE.Vector3(0, -500, -1500)));
+    scene.add(gridLayer(10000, 100, 0.18, new THREE.Vector3(0,  500, -1500)));
+    // Back wall (rotate XZ grid → XY plane facing camera)
+    scene.add(gridLayer(10000,  60, 0.22,
+      new THREE.Vector3(0, 0, -4500),
+      new THREE.Euler(Math.PI / 2, 0, 0)));
+
+    // ---- GIANT WIREFRAME TYPOGRAPHY (loaded async) ----
+    const textGroup = new THREE.Group();
+    scene.add(textGroup);
+
+    const WORDS = [
+      { text: 'AI',        size: 240, pos: [-460, 220, -900 ], color: 0xffffff, rot: [0,  0.18, 0] },
+      { text: 'NEURAL',    size: 160, pos: [ 540,-130, -1500], color: 0x1a56ff, rot: [0, -0.22, 0] },
+      { text: 'MIND',      size: 380, pos: [   0,  20, -3000], color: 0x1a56ff, rot: [0,  0.00, 0] },
+      { text: 'DEEP',      size: 200, pos: [-680,-380, -1900], color: 0xffffff, rot: [0,  0.28, 0] },
+      { text: 'PROCESS',   size: 130, pos: [-800, 380, -2100], color: 0x1a56ff, rot: [0,  0.32, 0] },
+      { text: 'THINK',     size: 170, pos: [ 760,-340, -2400], color: 0xffffff, rot: [0, -0.42, 0] },
+      { text: 'LEARN',     size: 220, pos: [ 380, 460, -2800], color: 0xffffff, rot: [0, -0.18, 0] },
+      { text: 'COGNITION', size: 140, pos: [-1100, 60, -3700], color: 0x1a56ff, rot: [0,  0.45, 0] },
+    ];
+
+    const FONT_URL = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json';
+    if (THREE.FontLoader && THREE.TextGeometry) {
+      new THREE.FontLoader().load(FONT_URL, function (font) {
+        WORDS.forEach(w => {
+          const textGeo = new THREE.TextGeometry(w.text, {
+            font: font,
+            size: w.size,
+            height: Math.max(4, w.size * 0.04),
+            curveSegments: 4,
+            bevelEnabled: false,
+          });
+          textGeo.center();
+          const wireGeo = new THREE.WireframeGeometry(textGeo);
+          const mat = new THREE.LineBasicMaterial({
+            color: w.color,
+            transparent: true,
+            opacity: 0.55,
+            depthWrite: false,
+          });
+          const lines = new THREE.LineSegments(wireGeo, mat);
+          lines.position.set(w.pos[0], w.pos[1], w.pos[2]);
+          lines.rotation.set(w.rot[0], w.rot[1], w.rot[2]);
+          textGroup.add(lines);
+        });
+      }, undefined, (err) => console.warn('[brain] font load failed', err));
+    }
+
+    // ---- SHATTER WALL: snapshot the whole 2D page → grid of textured planes ----
+    // Wall sized to fill the camera's view at CAM_HOME_Z so it reads as "the screen".
+    const SHATTER_COLS = 12;
+    const SHATTER_ROWS = 8;
+    const WALL_W = 1340;
+    const WALL_H = 698;           // aspect 1.92 ≈ 1440/750 (the stage)
+    let shatterGroup = null;
+
+    // Reconstruct the visible page (bg + dithered statue + the three title blocks)
+    // onto a 1440×750 canvas so the shattering fragments show the real composition.
+    function buildSnapshot() {
+      const s = document.createElement('canvas');
+      s.width = 1440; s.height = 750;
+      const x = s.getContext('2d');
+      x.fillStyle = '#010103';
+      x.fillRect(0, 0, 1440, 750);
+      try { x.drawImage(statueCanvas, 411, 16, 618, 670); } catch (e) {}
+      x.textBaseline = 'top';
+      // "The"
+      x.fillStyle = '#aeaeae';
+      x.font = '400 112px "TASA Orbiter Display", system-ui, sans-serif';
+      x.fillText('The', 120, 95);
+      // "Ideal"
+      x.fillStyle = '#ffffff';
+      x.font = 'italic 400 133px "Instrument Serif", serif';
+      x.fillText('Ideal', 200, 198);
+      // "Candidate" (centered)
+      x.font = '400 112px "TASA Orbiter Display", system-ui, sans-serif';
+      x.textAlign = 'center';
+      x.fillText('Candidate', 720, 458);
+      x.textAlign = 'left';
+      return s;
+    }
+    function buildShatterWall() {
+      const tex = new THREE.CanvasTexture(buildSnapshot());
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+
+      const fw = WALL_W / SHATTER_COLS;
+      const fh = WALL_H / SHATTER_ROWS;
+      const group = new THREE.Group();
+
+      for (let r = 0; r < SHATTER_ROWS; r++) {
+        for (let c = 0; c < SHATTER_COLS; c++) {
+          const geo = new THREE.PlaneGeometry(fw, fh, 1, 1);
+          // Crop UVs to this fragment's tile of the texture (v flipped: canvas y-down → tex y-up)
+          const uv = geo.attributes.uv;
+          const u0 = c / SHATTER_COLS;
+          const u1 = (c + 1) / SHATTER_COLS;
+          const v0 = 1 - (r + 1) / SHATTER_ROWS;
+          const v1 = 1 - r / SHATTER_ROWS;
+          uv.setXY(0, u0, v1);
+          uv.setXY(1, u1, v1);
+          uv.setXY(2, u0, v0);
+          uv.setXY(3, u1, v0);
+          uv.needsUpdate = true;
+
+          const mat = new THREE.MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+
+          const ox = (c - SHATTER_COLS / 2 + 0.5) * fw;
+          const oy = (SHATTER_ROWS / 2 - r - 0.5) * fh;
+          mesh.position.set(ox, oy, 0);
+          mesh.userData.origin = { x: ox, y: oy, z: 0 };
+
+          // Scatter target: explode radially outward + fly forward past camera
+          const angle  = Math.atan2(oy, ox);
+          const radius = Math.hypot(ox, oy);
+          const blast  = 3.2 + Math.random() * 1.8;
+          mesh.userData.scatter = {
+            x: Math.cos(angle) * (radius * blast + 500 + Math.random() * 450),
+            y: Math.sin(angle) * (radius * blast + 500 + Math.random() * 450),
+            z: 900 + Math.random() * 700,
+            rx: (Math.random() - 0.5) * Math.PI * 3,
+            ry: (Math.random() - 0.5) * Math.PI * 3,
+            rz: (Math.random() - 0.5) * Math.PI * 3,
+          };
+          group.add(mesh);
+        }
+      }
+      group.userData.texture = tex;
+      return group;
+    }
+    function disposeShatter(group) {
+      if (!group) return;
+      scene.remove(group);
+      group.children.forEach(m => {
+        m.geometry.dispose();
+        m.material.dispose();
+      });
+      if (group.userData.texture) group.userData.texture.dispose();
+    }
+
+    // ---- STATE ----
+    let isOpen = false;
+    let isAnimating = false;
+    let mouseX = 0, mouseY = 0;
+    let camX = 0, camY = 0;
+    const shake = { amt: 0 };      // camera-shake magnitude during the dive
+
+    // ---- OPEN: warp-blur + shatter wall + camera dive ----
+    function open() {
+      if (isOpen || isAnimating) return;
+      isAnimating = true;
+
+      // Reset camera/post to home state
+      camera.position.set(0, 0, CAM_HOME_Z);
+      camera.rotation.set(0, 0, 0);
+      camera.fov = FOV_HOME; camera.updateProjectionMatrix();
+      camX = 0; camY = 0;
+      shake.amt = 0;
+      setBlur(0);
+
+      // Snapshot the page → shatter wall, placed exactly where the screen sits
+      shatterGroup = buildShatterWall();
+      shatterGroup.position.z = WALL_Z;
+      scene.add(shatterGroup);
+
+      // Show overlay (the wall reproduces the page, so the cut is seamless)
+      overlay.classList.add('inside-brain');
+
+      const DUR = 2.6;
+      const tl = gsap.timeline({
+        onComplete: () => {
+          disposeShatter(shatterGroup);
+          shatterGroup = null;
+          setBlur(0);
+          shake.amt = 0;
+          camera.fov = FOV_HOME; camera.updateProjectionMatrix();
+          isAnimating = false;
+          isOpen = true;
+        }
+      });
+
+      // Camera plunge forward (-z) through the wall into the void
+      tl.to(camera.position, { z: CAM_INSIDE_Z, duration: DUR, ease: 'power4.inOut' }, 0);
+
+      // Fish-eye FOV punch (rush out, then settle back)
+      const fov = { v: FOV_HOME };
+      const applyFov = () => { camera.fov = fov.v; camera.updateProjectionMatrix(); };
+      tl.to(fov, { v: FOV_DIVE, duration: DUR * 0.45, ease: 'power2.in',  onUpdate: applyFov }, 0);
+      tl.to(fov, { v: FOV_HOME, duration: DUR * 0.55, ease: 'power3.out', onUpdate: applyFov }, DUR * 0.45);
+
+      // Radial zoom-blur + chromatic aberration: spike on break-through, ease out
+      if (blurPass) {
+        tl.fromTo(blurPass.uniforms.uStrength, { value: 0 },
+          { value: 1.15, duration: DUR * 0.42, ease: 'power2.in' }, 0);
+        tl.to(blurPass.uniforms.uStrength,
+          { value: 0, duration: DUR * 0.5, ease: 'power2.out' }, DUR * 0.45);
+      }
+
+      // Camera shake through the violent middle
+      tl.fromTo(shake, { amt: 0 }, { amt: 15, duration: DUR * 0.42, ease: 'power2.in' }, 0);
+      tl.to(shake, { amt: 0, duration: DUR * 0.5, ease: 'power2.out' }, DUR * 0.45);
+
+      // Subtle roll mid-dive
+      tl.to(camera.rotation, { z: 0.1, duration: DUR * 0.5, ease: 'power2.inOut', yoyo: true, repeat: 1 }, 0.2);
+
+      // Fragments explode outward + whip past the camera, spin, then fade
+      shatterGroup.children.forEach((frag) => {
+        const s = frag.userData.scatter;
+        tl.to(frag.position, { x: s.x, y: s.y, z: s.z, duration: DUR, ease: 'power4.inOut' }, 0);
+        tl.to(frag.rotation, { x: s.rx, y: s.ry, z: s.rz, duration: DUR, ease: 'power3.inOut' }, 0);
+        tl.to(frag.material, { opacity: 0, duration: 0.7, ease: 'power2.in' }, DUR * 0.5);
+      });
+    }
+
+    // ---- CLOSE: build wall in scattered state in front of camera, reassemble, pull back, fade ----
+    function close() {
+      if (!isOpen || isAnimating) return;
+      isAnimating = true;
+
+      // Build a fresh wall in front of camera (in -z direction)
+      shatterGroup = buildShatterWall();
+      const FRONT_DIST = 800;
+      shatterGroup.position.set(0, 0, camera.position.z - FRONT_DIST);
+      scene.add(shatterGroup);
+
+      // Initialize fragments at scattered positions (relative to group), opacity 0
+      shatterGroup.children.forEach(frag => {
+        const s = frag.userData.scatter;
+        frag.position.set(s.x, s.y, s.z);
+        frag.rotation.set(s.rx, s.ry, s.rz);
+        frag.material.opacity = 0;
+      });
+
+      const DUR = 1.8;
+      const startZ = camera.position.z;
+      const tl = gsap.timeline({
+        onComplete: () => {
+          // After reassembly + pullback, fade overlay (via inline opacity override),
+          // then strip the class and clean up.
+          gsap.to(overlay, {
+            opacity: 0,
+            duration: 0.5,
+            ease: 'power2.inOut',
+            onComplete: () => {
+              overlay.classList.remove('inside-brain');
+              overlay.style.opacity = ''; // give CSS back control for next open
+              disposeShatter(shatterGroup);
+              shatterGroup = null;
+              camera.position.set(0, 0, CAM_HOME_Z);
+              camera.rotation.set(0, 0, 0);
+              camera.fov = FOV_HOME; camera.updateProjectionMatrix();
+              camX = 0; camY = 0;
+              setBlur(0); shake.amt = 0;
+              isAnimating = false;
+              isOpen = false;
+            }
+          });
+        }
+      });
+
+      // Camera pulls back (toward +z), recentering x/y
+      tl.to(camera.position, { x: 0, y: 0, z: startZ + 320, duration: DUR, ease: 'power3.inOut' }, 0);
+
+      // Level the camera rotation
+      tl.to(camera.rotation, { x: 0, y: 0, z: 0, duration: DUR * 0.85, ease: 'power2.inOut' }, 0);
+
+      // A softer blur pulse as the screen re-forms
+      if (blurPass) {
+        tl.fromTo(blurPass.uniforms.uStrength, { value: 0 },
+          { value: 0.8, duration: DUR * 0.4, ease: 'power2.in' }, 0);
+        tl.to(blurPass.uniforms.uStrength,
+          { value: 0, duration: DUR * 0.55, ease: 'power2.out' }, DUR * 0.4);
+      }
+
+      // Reassemble: fragments fly back to origin, rotation back to 0, opacity back to 1
+      shatterGroup.children.forEach(frag => {
+        const o = frag.userData.origin;
+        tl.to(frag.position, { x: o.x, y: o.y, z: o.z, duration: DUR, ease: 'power3.inOut' }, 0);
+        tl.to(frag.rotation, { x: 0, y: 0, z: 0, duration: DUR, ease: 'power3.inOut' }, 0);
+        tl.to(frag.material, { opacity: 1, duration: 0.7, ease: 'power2.out' }, 0.35);
+      });
+    }
+
+    // ---- MOUSE PARALLAX (active only after the dive completes) ----
+    window.addEventListener('mousemove', (e) => {
+      mouseX = (e.clientX / window.innerWidth)  * 2 - 1;
+      mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+    }, { passive: true });
+
+    // ---- RENDER LOOP ----
+    function loop() {
+      requestAnimationFrame(loop);
+      if (!isOpen && !isAnimating) return;
+
+      // Camera shake during the dive (GSAP owns z/rotation; shake owns x/y here)
+      if (isAnimating && shake.amt > 0.01) {
+        camera.position.x = (Math.random() - 0.5) * shake.amt;
+        camera.position.y = (Math.random() - 0.5) * shake.amt;
+      }
+
+      // Parallax only once settled inside the void
+      if (isOpen && !isAnimating) {
+        const tx = mouseX * 140;
+        const ty = -mouseY * 80;
+        camX += (tx - camX) * 0.045;
+        camY += (ty - camY) * 0.045;
+        camera.position.x = camX;
+        camera.position.y = camY;
+        camera.rotation.y = -mouseX * 0.18;
+        camera.rotation.x =  mouseY * 0.10;
+      }
+
+      // Subtle typography breathing — sells the "vast space" feel
+      textGroup.rotation.y = Math.sin(performance.now() * 0.00018) * 0.04;
+
+      if (composer) composer.render();
+      else renderer.render(scene, camera);
+    }
+    loop();
+
+    // ---- WIRE UP CLOSE BUTTON + ESC ----
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isOpen && !isAnimating) close();
+    });
+
+    return {
+      open, close,
+      isOpen: () => isOpen,
+    };
+  })();
+
+  // === Hover interactions — toggle .active on the matching feature ===
   document.querySelectorAll('.hover-zone').forEach(zone => {
     const feat = document.getElementById('feat-' + zone.dataset.target);
     zone.addEventListener('mouseenter', () => feat.classList.add('active'));
     zone.addEventListener('mouseleave', () => feat.classList.remove('active'));
-    // Touch support: tap to toggle
     zone.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Head, when revealed, enters the brain
+      if (zone.dataset.target === 'head' && feat.classList.contains('active')) {
+        brain.open();
+        return;
+      }
+      // Touch toggle for the others
       const wasActive = feat.classList.contains('active');
       document.querySelectorAll('.feature').forEach(f => f.classList.remove('active'));
       if (!wasActive) feat.classList.add('active');
     });
   });
+
+  // Spec asks for click on the .box itself; even though .hover-zone (z:20) sits
+  // above it, wire the box too so it works if the zone is ever bypassed.
+  const headBox = document.querySelector('#feat-head .box');
+  if (headBox) {
+    headBox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      brain.open();
+    });
+  }
 </script>
 </body>
 </html>
