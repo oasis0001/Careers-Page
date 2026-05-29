@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Ideal Candidate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  @font-face {
+    font-family: 'TASA Orbiter Display';
+    src: url('fonts/TASAOrbiterDisplay-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #010103;
+    --text: #ffffff;
+    --text-muted: #aeaeae;
+  }
+  html, body {
+    background: var(--bg);
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .scale-wrap {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .stage {
+    position: relative;
+    width: 1440px;
+    height: 750px;
+    transform-origin: center center;
+    background: var(--bg);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* Background ASCII pattern */
+  .bg-ascii {
+    position: absolute;
+    inset: 0;
+    background-image: url('assets/ascii-art.png');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.18;
+    mix-blend-mode: exclusion;
+    pointer-events: none;
+  }
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at center, transparent 30%, rgba(1,1,3,0.7) 90%),
+      linear-gradient(180deg, transparent 60%, var(--bg) 100%);
+    pointer-events: none;
+  }
+
+  /* Statue (animated ASCII dither canvas) */
+  .statue {
+    position: absolute;
+    left: 411px;
+    top: 16px;
+    width: 618px;
+    height: 670px;
+    pointer-events: none;
+    display: block;
+  }
+
+  /* Title — "The Ideal" */
+  .title-the {
+    position: absolute;
+    left: 120px;
+    top: 95px;
+    font-family: 'TASA Orbiter Display', 'TASA Orbiter', system-ui, sans-serif;
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 112px;
+    line-height: 0.9;
+    letter-spacing: -5.5px;
+    z-index: 3;
+  }
+  .title-the .ideal {
+    display: block;
+    margin-left: 80px;
+    margin-top: 4px;
+    color: var(--text);
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 133px;
+    letter-spacing: -3px;
+  }
+
+  /* Title — "Candidate" */
+  .title-candidate {
+    position: absolute;
+    left: 50%;
+    top: 460px;
+    transform: translateX(-50%);
+    font-family: 'TASA Orbiter Display', 'TASA Orbiter', system-ui, sans-serif;
+    font-weight: 400;
+    color: var(--text);
+    font-size: 112px;
+    line-height: 0.9;
+    letter-spacing: -5.5px;
+    white-space: nowrap;
+    z-index: 3;
+  }
+
+  /* Feature reveal */
+  .feature {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .feature .box {
+    position: absolute;
+    border: 1px solid #ffffff;
+    background: rgba(217, 217, 217, 0.10);
+    opacity: 0;
+    transform: scale(0.86);
+    transform-origin: center;
+    transition: opacity 260ms cubic-bezier(0.2, 0.7, 0.2, 1),
+                transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    box-shadow: 0 0 18px rgba(255,255,255,0.05) inset;
+  }
+  .feature .dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #ffffff;
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+  }
+  .feature .marker {
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    color: rgba(255,255,255,0.85);
+    font-size: 7.5px;
+    font-weight: 400;
+    letter-spacing: 0.4px;
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+    pointer-events: none;
+  }
+  .feature .line {
+    position: absolute;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .feature .line path {
+    fill: none;
+    stroke: #ffffff;
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-dasharray: var(--len);
+    stroke-dashoffset: var(--len);
+    transition: stroke-dashoffset 620ms cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .feature .endpoint {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #ffffff;
+    opacity: 0;
+    transition: opacity 180ms ease-out;
+    transform: translate(-50%, -50%);
+  }
+  .feature .text {
+    position: absolute;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 400;
+    font-size: 14.5px;
+    color: var(--text);
+    letter-spacing: -0.29px;
+    line-height: 1;
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity 260ms ease-out, transform 260ms ease-out;
+  }
+
+  /* Active state cascading transitions */
+  .feature.active .box {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .feature.active .dot {
+    opacity: 1;
+    transition-delay: 80ms;
+  }
+  .feature.active .marker {
+    opacity: 0.9;
+    transition-delay: 120ms;
+  }
+  .feature.active .line path {
+    stroke-dashoffset: 0;
+    transition-delay: 240ms;
+  }
+  .feature.active .endpoint {
+    opacity: 1;
+    transition-delay: 820ms;
+  }
+  .feature.active .text {
+    opacity: 1;
+    transform: translate(0,0);
+    transition-delay: 720ms;
+  }
+
+  /* Pre-active text offsets for slide-in */
+  #feat-head .text { transform: translateX(-6px); }
+  #feat-eye  .text { transform: translate(-6px, -4px); }
+  #feat-mouth .text { transform: translateX(6px); }
+
+  /* Hover zones */
+  .hover-zone {
+    position: absolute;
+    cursor: crosshair;
+    pointer-events: auto;
+    z-index: 20;
+    background: transparent;
+  }
+
+  /* Footer hint */
+  .hint {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    z-index: 4;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="scale-wrap">
+  <div class="stage" id="stage">
+    <div class="bg-vignette"></div>
+
+    <canvas class="statue" id="statueCanvas" aria-hidden="true"></canvas>
+
+    <div class="title-the">The<span class="ideal">Ideal</span></div>
+    <div class="title-candidate">Candidate</div>
+
+    <!-- ====== Feature: HEAD / Forehead ====== -->
+    <div class="feature" id="feat-head">
+      <div class="box" style="left:604.2px; top:95.44px; width:254.34px; height:69.1px;"></div>
+
+      <div class="dot" style="left:601.14px; top:92.39px;"></div>
+      <div class="dot" style="left:855.48px; top:92.39px;"></div>
+      <div class="dot" style="left:601.14px; top:161.49px;"></div>
+      <div class="dot" style="left:855.48px; top:161.49px;"></div>
+
+      <div class="marker" style="left:594px; top:80px;">x100</div>
+      <div class="marker" style="left:848px; top:80px;">x100</div>
+      <div class="marker" style="left:594px; top:170px;">x100</div>
+      <div class="marker" style="left:848px; top:170px;">x100</div>
+
+      <svg class="line" style="left:858.54px; top:139.69px; width:259.824px; height:11px;" viewBox="0 0 259.824 10.88" preserveAspectRatio="none">
+        <path d="M0.02 0.27 L117.91 10.61 L259.82 10.61" style="--len: 260.2;" />
+      </svg>
+
+      <div class="text" style="left:980px; top:132px;">WHO THINKS ONLY AI</div>
+    </div>
+
+    <!-- ====== Feature: EYE / Face ====== -->
+    <div class="feature" id="feat-eye">
+      <div class="box" style="left:674.09px; top:234.97px; width:78.93px; height:70.43px;"></div>
+
+      <div class="dot" style="left:671.97px; top:233.11px;"></div>
+      <div class="dot" style="left:748.51px; top:232.85px;"></div>
+      <div class="dot" style="left:672.23px; top:300.88px;"></div>
+      <div class="dot" style="left:748.51px; top:301.15px;"></div>
+
+      <div class="marker" style="left:665px; top:220px;">x100</div>
+      <div class="marker" style="left:745px; top:220px;">x100</div>
+      <div class="marker" style="left:663px; top:310px;">x100</div>
+      <div class="marker" style="left:745px; top:310px;">x100</div>
+
+      <svg class="line" style="left:752.63px; top:268.86px; width:381.11px; height:73px;" viewBox="0 0 381.11 72.99" preserveAspectRatio="none">
+        <path d="M0.12 0.24 L142.06 72.72 L381.11 72.72" style="--len: 398.4;" />
+      </svg>
+
+      <div class="text" style="left:935px; top:324px;">WHO SEES AI EVERYWHERE</div>
+    </div>
+
+    <!-- ====== Feature: MOUTH ====== -->
+    <div class="feature" id="feat-mouth">
+      <div class="box" style="left:615.62px; top:369.45px; width:96.21px; height:40.13px;"></div>
+
+      <div class="dot" style="left:612.44px; top:366.26px;"></div>
+      <div class="dot" style="left:707.58px; top:366.26px;"></div>
+      <div class="dot" style="left:612.44px; top:406.39px;"></div>
+      <div class="dot" style="left:708.38px; top:406.39px;"></div>
+
+      <div class="marker" style="left:602px; top:354px;">x100</div>
+      <div class="marker" style="left:699px; top:354px;">x100</div>
+      <div class="marker" style="left:602px; top:414px;">x100</div>
+      <div class="marker" style="left:699px; top:414px;">x100</div>
+
+      <svg class="line" style="left:222px; top:388px; width:397px; height:4px;" viewBox="0 0 397 4" preserveAspectRatio="none">
+        <path d="M397 2 L0 2" style="--len: 397;" />
+      </svg>
+
+      <div class="text" style="left:222px; top:372px;">WHO TALKS ONLY AI</div>
+    </div>
+
+    <!-- Hover trigger zones (transparent) -->
+    <div class="hover-zone" data-target="head"  style="left:600px; top:90px;  width:262px; height:80px;"></div>
+    <div class="hover-zone" data-target="eye"   style="left:668px; top:228px; width:90px;  height:82px;"></div>
+    <div class="hover-zone" data-target="mouth" style="left:610px; top:363px; width:104px; height:50px;"></div>
+
+    <div class="hint">Hover the head · eye · mouth</div>
+  </div>
+</div>
+
+<script>
+  // === Animated ASCII Dither — renders the man's head onto #statueCanvas ===
+  (function () {
+    const canvas = document.getElementById('statueCanvas');
+    if (!canvas) return;
+
+    // 2x oversample so characters stay crisp when the stage scales up
+    // (CSS display size is 618×670; internal pixel buffer is 2× that).
+    const OVERSAMPLE = 2;
+    const W = 618 * OVERSAMPLE;
+    const H = 670 * OVERSAMPLE;
+    canvas.width = W;
+    canvas.height = H;
+
+    const ctx = canvas.getContext('2d', { alpha: true });
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = W;
+    offscreen.height = H;
+    const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
+
+    // Settings carried over from dither_gemini.html (default sidebar values).
+    // RES scales with oversample to preserve the character-grid density.
+    const RES         = 6 * OVERSAMPLE;
+    const NOISE       = 132;
+    const FPS         = 35;
+    const THRESH      = 1.7;
+    const CONTRAST    = 1.1;
+    const SHADOW_LIFT = 49;
+    const CHARSET     = "Ñ@#W$9876543210?!abc;:+=-,._ ";
+    const TINT        = { r: 0x1a, g: 0x56, b: 0xff };
+
+    const img = new Image();
+    let ready = false;
+    let lastDraw = 0;
+
+    img.onload = () => {
+      // Source aspect (1205×1306) matches canvas aspect (618×670), no cropping needed
+      offCtx.drawImage(img, 0, 0, W, H);
+      ready = true;
+    };
+    img.src = 'david_before.png';
+
+    function frame(ts) {
+      if (!ready) { requestAnimationFrame(frame); return; }
+      const interval = 1000 / FPS;
+      if (ts - lastDraw < interval) { requestAnimationFrame(frame); return; }
+      lastDraw = ts;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.font = `bold ${RES}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const pixels = offCtx.getImageData(0, 0, W, H).data;
+
+      for (let y = 0; y < H; y += RES) {
+        for (let x = 0; x < W; x += RES) {
+          const i = (y * W + x) * 4;
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3];
+
+          // Only render within the statue silhouette
+          if (a < 128) continue;
+
+          let brightness = r * 0.299 + g * 0.587 + b * 0.114;
+          brightness = ((brightness / 255 - 0.5) * CONTRAST + 0.5) * 255;
+          brightness = brightness + SHADOW_LIFT * (1 - Math.max(0, Math.min(255, brightness)) / 255);
+
+          const noise = (Math.random() - 0.5) * NOISE;
+          brightness = brightness * THRESH + noise;
+          brightness = Math.max(0, Math.min(255, brightness));
+
+          if (brightness < 10) continue;
+
+          const charIndex = Math.floor((1 - brightness / 255) * (CHARSET.length - 1));
+          const intensity = brightness / 255;
+          ctx.fillStyle = `rgb(${TINT.r * intensity}, ${TINT.g * intensity}, ${TINT.b * intensity})`;
+          ctx.fillText(CHARSET[charIndex], x + RES / 2, y + RES / 2);
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  })();
+
+  // Fit the 1440x750 stage proportionally inside the viewport
+  (function () {
+    const stage = document.getElementById('stage');
+    function fit() {
+      const sx = window.innerWidth / 1440;
+      const sy = window.innerHeight / 750;
+      const s = Math.min(sx, sy);
+      stage.style.transform = `scale(${s})`;
+    }
+    window.addEventListener('resize', fit);
+    fit();
+  })();
+
+  // Hover interactions — toggle .active on the matching feature
+  document.querySelectorAll('.hover-zone').forEach(zone => {
+    const feat = document.getElementById('feat-' + zone.dataset.target);
+    zone.addEventListener('mouseenter', () => feat.classList.add('active'));
+    zone.addEventListener('mouseleave', () => feat.classList.remove('active'));
+    // Touch support: tap to toggle
+    zone.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasActive = feat.classList.contains('active');
+      document.querySelectorAll('.feature').forEach(f => f.classList.remove('active'));
+      if (!wasActive) feat.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

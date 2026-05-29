@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Animated ASCII Dither Effect</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg-main: #050505;
+            --bg-panel: #111113;
+            --border: #222225;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #ffffff;
+            --text-muted: #888890;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar Styling */
+        #controls {
+            width: 320px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            gap: 20px;
+            overflow-y: auto;
+            box-shadow: 5px 0 25px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        #controls::-webkit-scrollbar { width: 6px; }
+        #controls::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+        h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Upload Button */
+        .upload-btn {
+            background: var(--accent);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+        .upload-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        input[type="file"] { display: none; }
+
+        /* Form Controls */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .val-display { color: var(--text-main); }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #2a2a2a;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        select, input[type="color"] {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1a1a1c;
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 6px;
+            outline: none;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        input[type="color"] {
+            height: 40px;
+            padding: 2px 4px;
+        }
+
+        /* Canvas Area */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #111 0%, #000 100%);
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            max-width: 95%;
+            max-height: 95%;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        /* Drag & Drop Overlay */
+        #drop-overlay {
+            position: absolute;
+            inset: 20px;
+            border: 2px dashed #444;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+            transition: all 0.3s ease;
+            z-index: 5;
+        }
+        
+        #drop-overlay.hidden { opacity: 0; visibility: hidden; }
+        
+        #drop-overlay p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-top: 10px;
+        }
+        #drop-overlay svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--text-muted);
+        }
+
+        /* Drag active state */
+        body.dragover #drop-overlay {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+            opacity: 1;
+            visibility: visible;
+        }
+        body.dragover #drop-overlay p, body.dragover #drop-overlay svg {
+            color: var(--accent);
+            fill: var(--accent);
+        }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <h2>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Dither Studio
+    </h2>
+    
+    <div class="control-group">
+        <div class="control-header">
+            <span>Character Set</span>
+        </div>
+        <select id="charset">
+            <option value="blocks">Block Pixels (█ ▓ ▒ ░)</option>
+            <option value="ascii" selected>Standard ASCII (Ñ@#...)</option>
+            <option value="binary">Binary (1 0)</option>
+            <option value="minimal">Minimal (+ - .)</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Tint Color</span>
+        </div>
+        <input type="color" id="tintColor" value="#1a56ff">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Grid Resolution</span>
+            <span id="resolutionVal" class="val-display">6</span>
+        </div>
+        <input type="range" id="resolution" min="2" max="25" value="6">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Contrast</span>
+            <span id="contrastVal" class="val-display">1.1</span>
+        </div>
+        <input type="range" id="contrast" min="0.5" max="3.0" step="0.1" value="1.1">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Brightness Threshold</span>
+            <span id="thresholdVal" class="val-display">1.7</span>
+        </div>
+        <input type="range" id="threshold" min="0.1" max="2.0" step="0.1" value="1.7">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Shadow Brightness</span>
+            <span id="shadowLiftVal" class="val-display">49</span>
+        </div>
+        <input type="range" id="shadowLift" min="0" max="200" value="49">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Animated Noise</span>
+            <span id="noiseVal" class="val-display">132</span>
+        </div>
+        <input type="range" id="noise" min="0" max="150" value="132">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Animation Speed (FPS)</span>
+            <span id="fpsVal" class="val-display">35</span>
+        </div>
+        <input type="range" id="fps" min="1" max="60" value="35">
+    </div>
+</div>
+
+<div id="canvas-container">
+    <div id="drop-overlay">
+        <svg viewBox="0 0 24 24"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242M12 12v9M8 17l4-4 4 4"/></svg>
+        <p>Drop image here</p>
+    </div>
+    <canvas id="displayCanvas"></canvas>
+</div>
+
+<script>
+    // --- Elements ---
+    const displayCanvas = document.getElementById('displayCanvas');
+    const ctx = displayCanvas.getContext('2d', { alpha: false });
+    const dropOverlay = document.getElementById('drop-overlay');
+    
+    const offscreenCanvas = document.createElement('canvas');
+    const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+    
+    // --- State ---
+    let img = new Image();
+    let isImageLoaded = false;
+    let animationId;
+    let lastDrawTime = 0;
+
+    // --- Charsets ---
+    const charSets = {
+        ascii: "Ñ@#W$9876543210?!abc;:+=-,._ ",
+        blocks: "█▓▒░ ",
+        binary: "10 ",
+        minimal: "#*+-. "
+    };
+    
+    // --- UI Controls ---
+    const inputs = {
+        resolution: document.getElementById('resolution'),
+        noise: document.getElementById('noise'),
+        fps: document.getElementById('fps'),
+        threshold: document.getElementById('threshold'),
+        contrast: document.getElementById('contrast'),
+        shadowLift: document.getElementById('shadowLift'),
+        charset: document.getElementById('charset'),
+        tintColor: document.getElementById('tintColor')
+    };
+
+    // Update displays for sliders
+    ['resolution', 'noise', 'fps', 'threshold', 'contrast', 'shadowLift'].forEach(key => {
+        inputs[key].addEventListener('input', (e) => {
+            document.getElementById(`${key}Val`).innerText = e.target.value;
+        });
+    });
+
+    // --- Image Loading ---
+    function handleImageLoad(src) {
+        img.onload = () => {
+            isImageLoaded = true;
+            dropOverlay.classList.add('hidden');
+            resizeCanvases();
+        };
+        img.src = src;
+    }
+
+    // --- Drag & Drop ---
+    document.body.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        document.body.classList.add('dragover');
+    });
+    
+    document.body.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        document.body.classList.remove('dragover');
+    });
+    
+    document.body.addEventListener('drop', (e) => {
+        e.preventDefault();
+        document.body.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (event) => handleImageLoad(event.target.result);
+            reader.readAsDataURL(e.dataTransfer.files[0]);
+        }
+    });
+
+    // --- Core Logic ---
+    function resizeCanvases() {
+        const container = document.getElementById('canvas-container');
+        const maxWidth = container.clientWidth - 40; // padding
+        const maxHeight = container.clientHeight - 40;
+        
+        if (isImageLoaded) {
+            let scale = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
+            displayCanvas.width = img.width * scale;
+            displayCanvas.height = img.height * scale;
+            offscreenCanvas.width = displayCanvas.width;
+            offscreenCanvas.height = displayCanvas.height;
+            offCtx.drawImage(img, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        } else {
+            // Idle state canvas size
+            displayCanvas.width = Math.min(600, maxWidth);
+            displayCanvas.height = Math.min(400, maxHeight);
+        }
+    }
+
+    // Convert Hex string to RGB object
+    function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 255, g: 255, b: 255 };
+    }
+
+    function drawASCII(timestamp) {
+        const fps = parseInt(inputs.fps.value);
+        const interval = 1000 / fps;
+
+        if (timestamp - lastDrawTime < interval) {
+            animationId = requestAnimationFrame(drawASCII);
+            return;
+        }
+        lastDrawTime = timestamp;
+
+        const res = parseInt(inputs.resolution.value);
+        const noiseLvl = parseInt(inputs.noise.value);
+        const thresh = parseFloat(inputs.threshold.value);
+        const contrast = parseFloat(inputs.contrast.value);
+        const shadowLift = parseInt(inputs.shadowLift.value);
+        
+        const density = charSets[inputs.charset.value];
+        const tint = hexToRgb(inputs.tintColor.value);
+
+        // Clear canvas with deep black
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, displayCanvas.width, displayCanvas.height);
+        
+        ctx.font = `bold ${res}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        if (isImageLoaded) {
+            // Render Image
+            const imgData = offCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+            const pixels = imgData.data;
+
+            for (let y = 0; y < displayCanvas.height; y += res) {
+                for (let x = 0; x < displayCanvas.width; x += res) {
+                    const index = (y * displayCanvas.width + x) * 4;
+
+                    let r = pixels[index];
+                    let g = pixels[index + 1];
+                    let b = pixels[index + 2];
+                    const a = pixels[index + 3];
+
+                    // Skip pixels outside the image silhouette so effects (shadow lift,
+                    // noise, etc.) only apply within the subject.
+                    if (a < 128) continue;
+
+                    // Grayscale conversion
+                    let brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+                    
+                    // Apply contrast
+                    brightness = ((brightness / 255 - 0.5) * contrast + 0.5) * 255;
+
+                    // Lift shadows — adds the most to darker pixels, nothing to highlights
+                    brightness = brightness + shadowLift * (1 - Math.max(0, Math.min(255, brightness)) / 255);
+
+                    // Apply Threshold and Noise
+                    let noise = (Math.random() - 0.5) * noiseLvl;
+                    brightness = (brightness * thresh) + noise;
+                    brightness = Math.max(0, Math.min(255, brightness));
+
+                    // Skip drawing if it's too dark (optimizes performance & creates true blacks)
+                    if (brightness < 10) continue; 
+
+                    // Map brightness to character
+                    const charIndex = Math.floor((1 - brightness / 255) * (density.length - 1));
+                    const char = density[charIndex];
+
+                    // Calculate tint based on brightness (shadows are darker tint, highlights are brighter)
+                    const intensity = brightness / 255;
+                    ctx.fillStyle = `rgb(${tint.r * intensity}, ${tint.g * intensity}, ${tint.b * intensity})`;
+                    
+                    ctx.fillText(char, x + res/2, y + res/2);
+                }
+            }
+        } else {
+            // Idle State (Animated static)
+            for (let y = 0; y < displayCanvas.height; y += res * 2) {
+                for (let x = 0; x < displayCanvas.width; x += res * 2) {
+                    if (Math.random() > 0.9) {
+                        const intensity = Math.random();
+                        ctx.fillStyle = `rgba(${tint.r}, ${tint.g}, ${tint.b}, ${intensity * 0.5})`;
+                        const charIndex = Math.floor(Math.random() * density.length);
+                        ctx.fillText(density[charIndex], x + res, y + res);
+                    }
+                }
+            }
+        }
+        
+        animationId = requestAnimationFrame(drawASCII);
+    }
+
+    // --- Initialization ---
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases(); // Initial sizing for idle state
+
+    // Auto-load the default image
+    handleImageLoad('david_before.png');
+
+    // Start loop
+    lastDrawTime = performance.now();
+    drawASCII(performance.now());
+
+</script>
+
+</body>
+</html>
