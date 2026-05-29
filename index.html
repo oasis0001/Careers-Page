@@ -304,6 +304,69 @@
     border-color: rgba(255, 255, 255, 0.45) !important;
     background: rgba(26, 86, 255, 0.08);
   }
+
+  /* === Brain ASCII scene (rotating dithered brain + orbiting AI taglines) === */
+  #brainAscii-overlay {
+    position: absolute;
+    inset: 0;
+    background: #010103;
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  #brainAscii-overlay.inside-brainAscii {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #brainSceneCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  /* leader lines + brain anchor dots */
+  #brainLeaders {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 1;
+  }
+  #brainLeaders .brain-leader {
+    stroke: #ffffff;
+    stroke-width: 1;
+    opacity: 0;
+  }
+  #brainLeaders .brain-node { fill: #ffffff; }
+  /* tagline labels (DOM, billboarded — always upright/facing camera) */
+  #brainLabels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+  #brainLabels .brain-tag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 400;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: #ffffff;
+    white-space: nowrap;
+    padding: 4px 9px;
+    background: rgba(1, 1, 3, 0.5);
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+  #brainLabels .brain-tag.accent { color: #a0f150; }
 </style>
 </head>
 <body>
@@ -384,13 +447,22 @@
     <div class="hover-zone" data-target="eye"   style="left:668px; top:228px; width:90px;  height:82px;"></div>
     <div class="hover-zone" data-target="mouth" style="left:610px; top:363px; width:104px; height:50px;"></div>
 
-    <div class="hint">Hover the head · eye · mouth · click HEAD to enter</div>
+    <div class="hint">Hover head · eye · mouth — click EYE to dive · click HEAD for the mind</div>
 
-    <!-- ===== 3D "Inside the Brain" overlay ===== -->
+    <!-- ===== 3D "Inside the Brain" overlay (shatter-dive void) — EYE ===== -->
     <div id="brain-overlay">
       <canvas id="brain3DCanvas"></canvas>
       <div class="brain-vignette"></div>
       <div class="btn-close-brain" style="position: absolute; top: 30px; right: 40px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); cursor: pointer; border: 1px solid rgba(255,255,255,0.15); padding: 8px 16px; letter-spacing: 1px;">[ ESCAPE_MIND ]</div>
+    </div>
+
+    <!-- ===== ASCII Brain scene (dithered brain + orbiting AI taglines) — HEAD ===== -->
+    <div id="brainAscii-overlay">
+      <canvas id="brainSceneCanvas"></canvas>
+      <svg id="brainLeaders" viewBox="0 0 1440 750" preserveAspectRatio="none"></svg>
+      <div id="brainLabels"></div>
+      <div class="brain-vignette"></div>
+      <div class="btn-close-brain" style="position: absolute; top: 30px; right: 40px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); cursor: pointer; border: 1px solid rgba(255,255,255,0.15); padding: 8px 16px; letter-spacing: 1px;">[ EXIT_BRAIN ]</div>
     </div>
   </div>
 </div>
@@ -403,6 +475,9 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lights/RectAreaLightUniformsLib.js"></script>
 <script>
   // === Animated ASCII Dither — renders the man's head onto #statueCanvas ===
   (function () {
@@ -513,7 +588,7 @@
 
     const overlay      = document.getElementById('brain-overlay');
     const canvas       = document.getElementById('brain3DCanvas');
-    const closeBtn     = document.querySelector('.btn-close-brain');
+    const closeBtn     = document.querySelector('#brain-overlay .btn-close-brain');
     const statueCanvas = document.getElementById('statueCanvas');
 
     const W = 1440, H = 750;
@@ -946,6 +1021,228 @@
     };
   })();
 
+  // === Brain ASCII scene — rotating dithered Brain.glb + orbiting AI taglines ===
+  // Anchors live in the brain's local space (so they rotate WITH it). Each frame
+  // we project each anchor to screen, billboard a DOM label + draw a leader line,
+  // and test the anchor's normal against the camera: front-facing → visible,
+  // swung behind → fades out. When an anchor returns to the front it is given a
+  // DIFFERENT tagline from the pool.
+  const brainAscii = (function () {
+    if (typeof THREE === 'undefined') {
+      return { open() {}, close() {}, isOpen: () => false };
+    }
+    const overlay  = document.getElementById('brainAscii-overlay');
+    const display  = document.getElementById('brainSceneCanvas');
+    const svg      = document.getElementById('brainLeaders');
+    const labels   = document.getElementById('brainLabels');
+    const closeBtn = overlay.querySelector('.btn-close-brain');
+    const ctx = display.getContext('2d', { alpha: false });
+
+    const W = 1440, H = 750;
+    display.width = W; display.height = H;
+
+    // Dither params (from dither_brain.html)
+    const RES = 8, NOISE = 110, FPS = 36, THRESH = 1.0, CONTRAST = 2.3, SHADOW_LIFT = 28;
+    const CHARSET = "Ñ@#W$9876543210?!abc;:+=-,._ ";
+    const TINT = { r: 0x1a, g: 0x56, b: 0xff };
+
+    // Brain transform
+    const ROT_Y = 0.42;                 // spin speed (rad/s)
+    const TILT  = { x: 0.0, y: -1.2, z: 0.0 };
+    const ZOOM  = 1.55;
+
+    // Tagline pool — reference lines + generated AI-news / neural-process flavour
+    const POOL = [
+      "OPTIMISING OUTPUT", "REMOVING ALL BIAS", "RUNNING SIMULATIONS", "SYNCING NEURAL PATHWAYS",
+      "PARSING THE FEED", "INDEXING AI NEWS", "TRAINING ON HEADLINES", "FETCHING NEW MODELS",
+      "DEBATING AGI TIMELINES", "RANKING BENCHMARKS", "EMBEDDING EVERYTHING", "PREDICTING NEXT TOKEN",
+      "SUMMARISING ARXIV", "DOOMSCROLLING THE TIMELINE", "UPDATING WORLD MODEL", "ROUTING ATTENTION",
+      "PRUNING DEAD NEURONS", "REFRESHING THE FEED", "FINE-TUNING OPINIONS", "DECODING THE HYPE",
+      "BENCHMARKING RIVALS", "CRAWLING THE WEB", "CACHING HOT TAKES", "ALIGNING INCENTIVES",
+      "COMPRESSING MEMORIES", "SCANNING FOR SIGNAL", "ANOTHER MODEL DROPPED", "READING THE CHANGELOG",
+      "QUESTIONING THE BENCHMARK", "GENERATING TAKES",
+    ];
+    let bag = [];
+    function drawTag() {
+      if (!bag.length) {
+        bag = POOL.slice();
+        for (let i = bag.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [bag[i], bag[j]] = [bag[j], bag[i]];
+        }
+      }
+      return bag.pop();
+    }
+
+    // Three.js (offscreen) → ASCII
+    let renderer, scene, camera, pivot, model, threeCanvas, offscreen, offCtx;
+    let baseDistance = 3, R = 1, loaded = false, started = false;
+    let isOpen = false, raf = 0, lastDraw = 0, lastT = performance.now();
+
+    const anchors = []; // { dir, dot, line, el, op, hidden, accent }
+
+    function initThree() {
+      threeCanvas = document.createElement('canvas');
+      renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setClearColor(0x000000, 0);
+      renderer.setSize(W, H, false);
+
+      offscreen = document.createElement('canvas'); offscreen.width = W; offscreen.height = H;
+      offCtx = offscreen.getContext('2d', { willReadFrequently: true });
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+      camera.position.set(0, 0, 3);
+
+      // Single rectangular area light → one lit side, dark elsewhere (high contrast)
+      if (THREE.RectAreaLightUniformsLib) THREE.RectAreaLightUniformsLib.init();
+      const light = new THREE.RectAreaLight(0xffffff, 12, 6, 6);
+      light.position.set(4, 2, 3); light.lookAt(0, 0, 0); scene.add(light);
+
+      pivot = new THREE.Group(); scene.add(pivot);
+
+      const draco = new THREE.DRACOLoader();
+      draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+      draco.setDecoderConfig({ type: 'js' });
+      const gltf = new THREE.GLTFLoader();
+      gltf.setDRACOLoader(draco);
+      gltf.load('Brain.glb', (g) => {
+        model = g.scene;
+        model.traverse(n => {
+          if (n.isMesh) n.material = new THREE.MeshStandardMaterial({ color: new THREE.Color('#3050ff'), roughness: 0.55, metalness: 0.05 });
+        });
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        R = maxDim * 0.5;
+        baseDistance = maxDim / (2 * Math.tan((camera.fov * Math.PI / 180) / 2));
+        model.rotation.set(TILT.x, TILT.y, TILT.z);
+        pivot.add(model);
+        buildAnchors();
+        loaded = true;
+      }, undefined, (e) => console.warn('[brainAscii] Brain.glb load failed', e));
+    }
+
+    function buildAnchors() {
+      // Directions spread in azimuth (around Y) so each cycles front↔back as it spins
+      const DIRS = [
+        [ 0.95,  0.20,  0.25], [ 0.45, -0.15,  0.88], [-0.55,  0.25,  0.80],
+        [-0.95, -0.10,  0.20], [-0.50, -0.22, -0.84], [ 0.60,  0.18, -0.78],
+      ];
+      DIRS.forEach((d, i) => {
+        const dir = new THREE.Vector3(d[0], d[1], d[2]).normalize();
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        dot.setAttribute('width', '5'); dot.setAttribute('height', '5'); dot.setAttribute('class', 'brain-node');
+        svg.appendChild(dot);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('class', 'brain-leader'); svg.appendChild(line);
+        const el = document.createElement('div'); el.className = 'brain-tag'; labels.appendChild(el);
+        anchors.push({ dir, dot, line, el, op: 0, hidden: true, accent: (i === 2) });
+      });
+    }
+
+    function project(v) {
+      const p = v.clone().project(camera);
+      return { x: (p.x * 0.5 + 0.5) * W, y: (-p.y * 0.5 + 0.5) * H };
+    }
+
+    function updateLabels() {
+      if (!loaded || !model) return;
+      model.updateMatrixWorld();
+      const q = new THREE.Quaternion(); model.getWorldQuaternion(q);
+      const centerS = project(new THREE.Vector3(0, 0, 0));
+      anchors.forEach(a => {
+        const world = a.dir.clone().multiplyScalar(R * 0.62).applyMatrix4(model.matrixWorld);
+        const nrm = a.dir.clone().applyQuaternion(q).normalize();
+        const toCam = camera.position.clone().sub(world).normalize();
+        const front = nrm.dot(toCam) > 0.16;
+
+        // Re-entering the front → assign a fresh tagline ("comes back as a different line")
+        if (front && a.hidden) {
+          a.el.textContent = drawTag();
+          a.el.classList.toggle('accent', a.accent);
+          a.hidden = false;
+        }
+        if (!front) a.hidden = true;
+
+        a.op += ((front ? 1 : 0) - a.op) * 0.16;
+
+        const s = project(world);
+        let dx = s.x - centerS.x, dy = s.y - centerS.y;
+        const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+        const off = 132;
+        const lx = s.x + dx * off, ly = s.y + dy * off;
+
+        a.dot.setAttribute('x', s.x - 2.5); a.dot.setAttribute('y', s.y - 2.5);
+        a.dot.style.opacity = a.op;
+        a.line.setAttribute('x1', s.x); a.line.setAttribute('y1', s.y);
+        a.line.setAttribute('x2', lx);  a.line.setAttribute('y2', ly);
+        a.line.style.opacity = a.op * 0.7;
+        a.el.style.opacity = a.op;
+        a.el.style.transform = `translate(${lx}px, ${ly}px) translate(${dx < 0 ? '-100%' : '0'}, -50%)`;
+      });
+    }
+
+    function dither() {
+      ctx.fillStyle = '#010103'; ctx.fillRect(0, 0, W, H);
+      ctx.font = `bold ${RES}px monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (!loaded) return;
+      offCtx.clearRect(0, 0, W, H);
+      offCtx.drawImage(threeCanvas, 0, 0, W, H);
+      const px = offCtx.getImageData(0, 0, W, H).data;
+      for (let y = 0; y < H; y += RES) {
+        for (let x = 0; x < W; x += RES) {
+          const i = (y * W + x) * 4;
+          if (px[i + 3] < 128) continue;
+          let b = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
+          b = ((b / 255 - 0.5) * CONTRAST + 0.5) * 255;
+          b = b + SHADOW_LIFT * (1 - Math.max(0, Math.min(255, b)) / 255);
+          b = b * THRESH + (Math.random() - 0.5) * NOISE;
+          b = Math.max(0, Math.min(255, b));
+          if (b < 10) continue;
+          const ci = Math.floor((1 - b / 255) * (CHARSET.length - 1));
+          const it = b / 255;
+          ctx.fillStyle = `rgb(${TINT.r * it}, ${TINT.g * it}, ${TINT.b * it})`;
+          ctx.fillText(CHARSET[ci], x + RES / 2, y + RES / 2);
+        }
+      }
+    }
+
+    function frame(now) {
+      raf = requestAnimationFrame(frame);
+      const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+      if (!isOpen) return;
+      if (loaded) {
+        pivot.rotation.y += ROT_Y * dt;
+        camera.position.z = baseDistance * ZOOM;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+      }
+      if (now - lastDraw >= 1000 / FPS) { lastDraw = now; dither(); }
+      updateLabels();
+    }
+
+    function open() {
+      if (isOpen) return;
+      if (!started) { initThree(); started = true; raf = requestAnimationFrame(frame); }
+      isOpen = true;
+      overlay.classList.add('inside-brainAscii');
+    }
+    function close() {
+      if (!isOpen) return;
+      isOpen = false;
+      overlay.classList.remove('inside-brainAscii');
+    }
+
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) close(); });
+
+    return { open, close, isOpen: () => isOpen };
+  })();
+
   // === Hover interactions — toggle .active on the matching feature ===
   document.querySelectorAll('.hover-zone').forEach(zone => {
     const feat = document.getElementById('feat-' + zone.dataset.target);
@@ -953,10 +1250,10 @@
     zone.addEventListener('mouseleave', () => feat.classList.remove('active'));
     zone.addEventListener('click', (e) => {
       e.stopPropagation();
-      // Head, when revealed, enters the brain
-      if (zone.dataset.target === 'head' && feat.classList.contains('active')) {
-        brain.open();
-        return;
+      // When revealed: EYE dives into the 3D void, HEAD opens the ASCII brain
+      if (feat.classList.contains('active')) {
+        if (zone.dataset.target === 'eye')  { brain.open();      return; }
+        if (zone.dataset.target === 'head') { brainAscii.open(); return; }
       }
       // Touch toggle for the others
       const wasActive = feat.classList.contains('active');
@@ -965,15 +1262,11 @@
     });
   });
 
-  // Spec asks for click on the .box itself; even though .hover-zone (z:20) sits
-  // above it, wire the box too so it works if the zone is ever bypassed.
+  // Also wire the boxes directly (safety net if a hover-zone is ever bypassed)
+  const eyeBox = document.querySelector('#feat-eye .box');
+  if (eyeBox) eyeBox.addEventListener('click', (e) => { e.stopPropagation(); brain.open(); });
   const headBox = document.querySelector('#feat-head .box');
-  if (headBox) {
-    headBox.addEventListener('click', (e) => {
-      e.stopPropagation();
-      brain.open();
-    });
-  }
+  if (headBox) headBox.addEventListener('click', (e) => { e.stopPropagation(); brainAscii.open(); });
 </script>
 </body>
 </html>

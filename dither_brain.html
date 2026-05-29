@@ -192,49 +192,49 @@
     <div class="control-group">
         <div class="control-header">
             <span>Grid Resolution</span>
-            <span id="resolutionVal" class="val-display">6</span>
+            <span id="resolutionVal" class="val-display">12</span>
         </div>
-        <input type="range" id="resolution" min="2" max="25" value="6">
+        <input type="range" id="resolution" min="2" max="25" value="12">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Contrast</span>
-            <span id="contrastVal" class="val-display">1.1</span>
+            <span id="contrastVal" class="val-display">2.3</span>
         </div>
-        <input type="range" id="contrast" min="0.5" max="3.0" step="0.1" value="1.1">
+        <input type="range" id="contrast" min="0.5" max="3.0" step="0.1" value="2.3">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Brightness Threshold</span>
-            <span id="thresholdVal" class="val-display">1.7</span>
+            <span id="thresholdVal" class="val-display">1</span>
         </div>
-        <input type="range" id="threshold" min="0.1" max="2.0" step="0.1" value="1.7">
+        <input type="range" id="threshold" min="0.1" max="2.0" step="0.1" value="1">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Shadow Brightness</span>
-            <span id="shadowLiftVal" class="val-display">49</span>
+            <span id="shadowLiftVal" class="val-display">25</span>
         </div>
-        <input type="range" id="shadowLift" min="0" max="200" value="49">
+        <input type="range" id="shadowLift" min="0" max="200" value="25">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Animated Noise</span>
-            <span id="noiseVal" class="val-display">132</span>
+            <span id="noiseVal" class="val-display">122</span>
         </div>
-        <input type="range" id="noise" min="0" max="150" value="132">
+        <input type="range" id="noise" min="0" max="150" value="122">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Animation Speed (FPS)</span>
-            <span id="fpsVal" class="val-display">35</span>
+            <span id="fpsVal" class="val-display">36</span>
         </div>
-        <input type="range" id="fps" min="1" max="60" value="35">
+        <input type="range" id="fps" min="1" max="60" value="36">
     </div>
 
     <div class="section-title">3D Model</div>
@@ -257,10 +257,34 @@
 
     <div class="control-group">
         <div class="control-header">
-            <span>Tilt X</span>
-            <span id="tiltXVal" class="val-display">-0.2</span>
+            <span>Rotation Speed Z</span>
+            <span id="rotZVal" class="val-display">0.0</span>
         </div>
-        <input type="range" id="tiltX" min="-1.5" max="1.5" step="0.05" value="-0.2">
+        <input type="range" id="rotZ" min="-3" max="3" step="0.1" value="0">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Tilt X</span>
+            <span id="tiltXVal" class="val-display">0</span>
+        </div>
+        <input type="range" id="tiltX" min="-1.5" max="1.5" step="0.05" value="0">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Tilt Y</span>
+            <span id="tiltYVal" class="val-display">-1.5</span>
+        </div>
+        <input type="range" id="tiltY" min="-1.5" max="1.5" step="0.05" value="-1.5">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Tilt Z</span>
+            <span id="tiltZVal" class="val-display">0.0</span>
+        </div>
+        <input type="range" id="tiltZ" min="-1.5" max="1.5" step="0.05" value="0">
     </div>
 
     <div class="control-group">
@@ -278,10 +302,10 @@
 
     <div class="control-group">
         <div class="control-header">
-            <span>Key Light Intensity</span>
-            <span id="keyVal" class="val-display">1.8</span>
+            <span>Light Intensity</span>
+            <span id="lightIntensityVal" class="val-display">12</span>
         </div>
-        <input type="range" id="keyIntensity" min="0" max="4" step="0.1" value="1.8">
+        <input type="range" id="lightIntensity" min="0" max="40" step="0.5" value="12">
     </div>
 </div>
 
@@ -302,6 +326,8 @@
 <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
     // --- DOM ---
     const displayCanvas = document.getElementById('displayCanvas');
@@ -341,24 +367,28 @@
 
     // --- UI inputs ---
     const inputs = {
-        resolution:   document.getElementById('resolution'),
-        noise:        document.getElementById('noise'),
-        fps:          document.getElementById('fps'),
-        threshold:    document.getElementById('threshold'),
-        contrast:     document.getElementById('contrast'),
-        shadowLift:   document.getElementById('shadowLift'),
-        charset:      document.getElementById('charset'),
-        tintColor:    document.getElementById('tintColor'),
-        rotY:         document.getElementById('rotY'),
-        rotX:         document.getElementById('rotX'),
-        tiltX:        document.getElementById('tiltX'),
-        zoom:         document.getElementById('zoom'),
-        modelColor:   document.getElementById('modelColor'),
-        keyIntensity: document.getElementById('keyIntensity'),
+        resolution:     document.getElementById('resolution'),
+        noise:          document.getElementById('noise'),
+        fps:            document.getElementById('fps'),
+        threshold:      document.getElementById('threshold'),
+        contrast:       document.getElementById('contrast'),
+        shadowLift:     document.getElementById('shadowLift'),
+        charset:        document.getElementById('charset'),
+        tintColor:      document.getElementById('tintColor'),
+        rotY:           document.getElementById('rotY'),
+        rotX:           document.getElementById('rotX'),
+        rotZ:           document.getElementById('rotZ'),
+        tiltX:          document.getElementById('tiltX'),
+        tiltY:          document.getElementById('tiltY'),
+        tiltZ:          document.getElementById('tiltZ'),
+        zoom:           document.getElementById('zoom'),
+        modelColor:     document.getElementById('modelColor'),
+        lightIntensity: document.getElementById('lightIntensity'),
     };
 
     ['resolution', 'noise', 'fps', 'threshold', 'contrast', 'shadowLift',
-     'rotY', 'rotX', 'tiltX', 'zoom', 'keyIntensity'].forEach(key => {
+     'rotY', 'rotX', 'rotZ', 'tiltX', 'tiltY', 'tiltZ', 'zoom',
+     'lightIntensity'].forEach(key => {
         inputs[key].addEventListener('input', (e) => {
             document.getElementById(`${key}Val`).innerText = e.target.value;
         });
@@ -380,21 +410,14 @@
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     camera.position.set(0, 0, 3);
 
-    // Lighting — strong key + cool fill + small ambient → studio look like David
-    const ambient = new THREE.AmbientLight(0xffffff, 0.18);
-    scene.add(ambient);
+    // Lighting — a single rectangular area light from one side. No ambient,
+    // no fill, no rim → unlit side stays completely dark for high contrast.
+    RectAreaLightUniformsLib.init();
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
-    keyLight.position.set(3, 4, 5);
-    scene.add(keyLight);
-
-    const fillLight = new THREE.DirectionalLight(0x6080ff, 0.45);
-    fillLight.position.set(-3, -1, 2);
-    scene.add(fillLight);
-
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
-    rimLight.position.set(-1, 2, -3);
-    scene.add(rimLight);
+    const areaLight = new THREE.RectAreaLight(0xffffff, 12, 6, 6);
+    areaLight.position.set(4, 2, 3);
+    areaLight.lookAt(0, 0, 0);
+    scene.add(areaLight);
 
     // Group wraps the brain so rotation pivots around its geometric center
     const brainGroup = new THREE.Group();
@@ -424,11 +447,18 @@
         applyModelColor(currentModelColor);
     });
 
-    inputs.keyIntensity.addEventListener('input', (e) => {
-        keyLight.intensity = parseFloat(e.target.value);
+    inputs.lightIntensity.addEventListener('input', (e) => {
+        areaLight.intensity = parseFloat(e.target.value);
     });
 
-    new GLTFLoader().load(
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+    dracoLoader.setDecoderConfig({ type: 'js' });
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    gltfLoader.load(
         'Brain.glb',
         (gltf) => {
             brainModel = gltf.scene;
@@ -526,11 +556,17 @@
         if (isBrainLoaded) {
             const rotY = parseFloat(inputs.rotY.value);
             const rotX = parseFloat(inputs.rotX.value);
+            const rotZ = parseFloat(inputs.rotZ.value);
             brainGroup.rotation.y += rotY * dt;
             brainGroup.rotation.x += rotX * dt;
+            brainGroup.rotation.z += rotZ * dt;
             // tilt is an absolute offset on top of the spinning; apply via brainModel
             // to keep brainGroup's rotation pure
-            brainModel.rotation.x = parseFloat(inputs.tiltX.value);
+            brainModel.rotation.set(
+                parseFloat(inputs.tiltX.value),
+                parseFloat(inputs.tiltY.value),
+                parseFloat(inputs.tiltZ.value)
+            );
         }
 
         // 2. camera zoom
