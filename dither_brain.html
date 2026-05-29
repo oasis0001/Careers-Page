@@ -313,12 +313,14 @@
         statusEl.className = kind;
     }
 
-    // file:// blocks fetch(), so the GLB loader will fail. Warn early.
-    if (location.protocol === 'file:') {
+    // file:// blocks fetch(), so the GLB loader will fail. Warn early and
+    // remember it so the loader's error callback doesn't override the hint.
+    const isFileProtocol = location.protocol === 'file:';
+    if (isFileProtocol) {
         setStatus(
             'Open this page via a local server, not <code>file://</code>.<br>' +
-            'Run <code>python3 -m http.server</code> in this folder, then visit ' +
-            '<code>http://localhost:8000/dither_brain.html</code>.',
+            'In a terminal in this folder run <code>python3 -m http.server 8000</code>, ' +
+            'then open <code>http://localhost:8000/dither_brain.html</code>.',
             'error'
         );
     } else {
@@ -457,6 +459,7 @@
             setStatus('', 'ok');
         },
         (xhr) => {
+            if (isFileProtocol) return; // keep the file:// warning visible
             if (xhr.lengthComputable) {
                 const pct = Math.round((xhr.loaded / xhr.total) * 100);
                 setStatus(`Loading 3D model… ${pct}%`);
@@ -464,10 +467,11 @@
         },
         (err) => {
             console.error('Failed to load Brain.glb:', err);
+            if (isFileProtocol) return; // file:// warning already shown
             setStatus(
                 'Failed to load <code>Brain.glb</code>.<br>' +
-                'Make sure the file is in the same folder and the page is served via HTTP.<br>' +
-                'Check the browser console for details.',
+                'Verify the file is next to <code>dither_brain.html</code> and the page is served over HTTP.<br>' +
+                'Check the browser console for the underlying error.',
                 'error'
             );
         }
