@@ -355,18 +355,100 @@
     left: 0;
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 400;
-    font-size: 13px;
+    font-size: 17px;          /* ← tag text size (all tags share this) */
     letter-spacing: 0.3px;
     line-height: 1;
     text-transform: uppercase;
     color: #ffffff;
     white-space: nowrap;
-    padding: 4px 9px;
+    padding: 5px 11px;
     background: rgba(1, 1, 3, 0.5);
     opacity: 0;
     will-change: transform, opacity;
   }
-  #brainLabels .brain-tag.accent { color: #a0f150; }
+
+  /* === Brain dither tuning panel (temporary) === */
+  #brainDitherControls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 300px;
+    height: 100%;
+    background: rgba(10, 10, 12, 0.92);
+    border-right: 1px solid #222225;
+    box-shadow: 5px 0 25px rgba(0,0,0,0.5);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    z-index: 10;
+    pointer-events: auto;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  #brainDitherControls::-webkit-scrollbar { width: 6px; }
+  #brainDitherControls::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+  #brainDitherControls h2 {
+    margin: 0 0 2px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: #fff;
+  }
+  #brainDitherControls .bd-group { display: flex; flex-direction: column; gap: 6px; }
+  #brainDitherControls .bd-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888890;
+    font-weight: 600;
+  }
+  #brainDitherControls .bd-val { color: #fff; }
+  #brainDitherControls input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #2a2a2a;
+    border-radius: 3px;
+    outline: none;
+  }
+  #brainDitherControls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+  }
+  #brainDitherControls select,
+  #brainDitherControls input[type="color"] {
+    width: 100%;
+    padding: 7px 10px;
+    background: #1a1a1c;
+    border: 1px solid #222225;
+    color: #fff;
+    border-radius: 6px;
+    outline: none;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  #brainDitherControls input[type="color"] { height: 36px; padding: 2px 4px; }
+  #brainDitherControls .bd-dump {
+    margin-top: 4px;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    padding: 9px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  #brainDitherControls .bd-dump:hover { background: #2563eb; }
 </style>
 </head>
 <body>
@@ -463,6 +545,94 @@
       <div id="brainLabels"></div>
       <div class="brain-vignette"></div>
       <div class="btn-close-brain" style="position: absolute; top: 30px; right: 40px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); cursor: pointer; border: 1px solid rgba(255,255,255,0.15); padding: 8px 16px; letter-spacing: 1px;">[ EXIT_BRAIN ]</div>
+
+      <!-- TEMPORARY tuning panel — remove once defaults are locked in -->
+      <div id="brainDitherControls">
+        <h2>Brain Dither Studio</h2>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Render Mode</span></div>
+          <select id="bd-style">
+            <option value="ascii">Standard ASCII (Ñ@#...)</option>
+            <option value="blocks">Block Pixels (█ ▓ ▒ ░)</option>
+            <option value="binary">Binary (1 0)</option>
+            <option value="minimal" selected>Minimal (# * + - .)</option>
+            <option value="halftone">Circle Halftone (○ •)</option>
+          </select>
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Tint Color</span></div>
+          <input type="color" id="bd-tint" value="#ffffff">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Tones (posterize)</span><span id="bd-tonesVal" class="bd-val">2</span></div>
+          <input type="range" id="bd-tones" min="2" max="8" value="2">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Highlight Intensity</span><span id="bd-highlightVal" class="bd-val">1.00</span></div>
+          <input type="range" id="bd-highlight" min="0.2" max="1.0" step="0.05" value="1.0">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Grid Resolution</span><span id="bd-resVal" class="bd-val">13</span></div>
+          <input type="range" id="bd-res" min="2" max="25" value="13">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Contrast</span><span id="bd-contrastVal" class="bd-val">2.3</span></div>
+          <input type="range" id="bd-contrast" min="0.5" max="3.0" step="0.1" value="2.3">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Brightness Threshold</span><span id="bd-threshVal" class="bd-val">1.7</span></div>
+          <input type="range" id="bd-thresh" min="0.1" max="2.0" step="0.1" value="1.7">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Shadow Brightness</span><span id="bd-shadowVal" class="bd-val">28</span></div>
+          <input type="range" id="bd-shadow" min="0" max="200" value="28">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Animated Noise</span><span id="bd-noiseVal" class="bd-val">47</span></div>
+          <input type="range" id="bd-noise" min="0" max="150" value="47">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Animation Speed (FPS)</span><span id="bd-fpsVal" class="bd-val">36</span></div>
+          <input type="range" id="bd-fps" min="1" max="60" value="36">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Spin Speed</span><span id="bd-spinVal" class="bd-val">0.42</span></div>
+          <input type="range" id="bd-spin" min="0" max="2" step="0.01" value="0.42">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Tilt X</span><span id="bd-tiltxVal" class="bd-val">0.00</span></div>
+          <input type="range" id="bd-tiltx" min="-3.2" max="3.2" step="0.05" value="0">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Tilt Y</span><span id="bd-tiltyVal" class="bd-val">-1.20</span></div>
+          <input type="range" id="bd-tilty" min="-3.2" max="3.2" step="0.05" value="-1.2">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Tilt Z</span><span id="bd-tiltzVal" class="bd-val">0.00</span></div>
+          <input type="range" id="bd-tiltz" min="-3.2" max="3.2" step="0.05" value="0">
+        </div>
+
+        <div class="bd-group">
+          <div class="bd-header"><span>Zoom</span><span id="bd-zoomVal" class="bd-val">1.00</span></div>
+          <input type="range" id="bd-zoom" min="0.5" max="3" step="0.05" value="1.0">
+        </div>
+
+        <button class="bd-dump" id="bd-dump">Log current values to console</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1041,15 +1211,18 @@
     const W = 1440, H = 750;
     display.width = W; display.height = H;
 
-    // Dither params (from dither_brain.html)
-    const RES = 8, NOISE = 110, FPS = 36, THRESH = 1.0, CONTRAST = 2.3, SHADOW_LIFT = 28;
-    const CHARSET = "Ñ@#W$9876543210?!abc;:+=-,._ ";
-    const TINT = { r: 0x1a, g: 0x56, b: 0xff };
+    // Dither params (from dither_brain.html) — mutable so the tuning panel can drive them
+    let RES = 13, NOISE = 47, FPS = 36, THRESH = 1.7, CONTRAST = 2.3, SHADOW_LIFT = 28;
+    let CHARSET = "#*+-. ";
+    let TINT = { r: 0xff, g: 0xff, b: 0xff };
+    let MODE = 'ascii';                 // 'ascii' = glyphs · 'halftone' = circle/ring dots
+    let TONES = 2;                      // posterize: number of hard brightness bands
+    let HIGHLIGHT = 1.0;                // intensity of the brightest (top) band
 
     // Brain transform
-    const ROT_Y = 0.42;                 // spin speed (rad/s)
-    const TILT  = { x: 0.0, y: -1.2, z: 0.0 };
-    const ZOOM  = 1.55;
+    let ROT_Y = 0.42;                 // spin speed (rad/s)
+    let TILT  = { x: 0.0, y: -1.2, z: 0.0 };
+    let ZOOM  = 1.0;
 
     // Tagline pool — reference lines + generated AI-news / neural-process flavour
     const POOL = [
@@ -1095,10 +1268,24 @@
       camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
       camera.position.set(0, 0, 3);
 
-      // Single rectangular area light → one lit side, dark elsewhere (high contrast)
+      // Key light: rectangular area light, grazing from the side so the folds
+      // cast shadows into their crevices → strong groove definition.
+      // Kept deliberately moderate so the lit side lands in the MIDTONES rather
+      // than clipping to flat white (which would erase the groove shading there).
       if (THREE.RectAreaLightUniformsLib) THREE.RectAreaLightUniformsLib.init();
-      const light = new THREE.RectAreaLight(0xffffff, 12, 6, 6);
-      light.position.set(4, 2, 3); light.lookAt(0, 0, 0); scene.add(light);
+      const light = new THREE.RectAreaLight(0xffffff, 6, 6, 6);
+      // position (x, y, z): x = right(+)/left(−), y = up(+)/down(−),
+      // z = front toward camera(+)/back away(−). Now: right + behind the brain.
+      // lookAt(0,0,0) always aims the light at the brain's centre.
+      light.position.set(6, 1, -4); light.lookAt(0, 0, 0); scene.add(light);
+
+      // Gentle fill from the opposite side — only enough to keep the shadowed
+      // hemisphere from crushing to pure black, NOT enough to flatten shading.
+      const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+      fill.position.set(-5, 1.5, 2); scene.add(fill);
+
+      // Faint wrap-around base so the deepest crevices retain a trace of detail.
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x0a0a10, 0.2));
 
       pivot = new THREE.Group(); scene.add(pivot);
 
@@ -1110,7 +1297,7 @@
       gltf.load('Brain.glb', (g) => {
         model = g.scene;
         model.traverse(n => {
-          if (n.isMesh) n.material = new THREE.MeshStandardMaterial({ color: new THREE.Color('#3050ff'), roughness: 0.55, metalness: 0.05 });
+          if (n.isMesh) n.material = new THREE.MeshStandardMaterial({ color: new THREE.Color('#cfcfcf'), roughness: 0.78, metalness: 0.0 });
         });
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
@@ -1127,12 +1314,16 @@
     }
 
     function buildAnchors() {
-      // Directions spread in azimuth (around Y) so each cycles front↔back as it spins
+      // Anchors live on the TOP and BOTTOM of the brain (strong ±Y), never the
+      // middle. Each still keeps an X/Z spread so it cycles front↔back as the
+      // brain spins around Y.
       const DIRS = [
-        [ 0.95,  0.20,  0.25], [ 0.45, -0.15,  0.88], [-0.55,  0.25,  0.80],
-        [-0.95, -0.10,  0.20], [-0.50, -0.22, -0.84], [ 0.60,  0.18, -0.78],
+        // top section
+        [ 0.55,  0.78,  0.30], [-0.42,  0.80,  0.45], [ 0.10,  0.82, -0.56],
+        // bottom section
+        [ 0.50, -0.72,  0.48], [-0.58, -0.70,  0.40], [-0.15, -0.80, -0.58],
       ];
-      DIRS.forEach((d, i) => {
+      DIRS.forEach((d) => {
         const dir = new THREE.Vector3(d[0], d[1], d[2]).normalize();
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         dot.setAttribute('width', '5'); dot.setAttribute('height', '5'); dot.setAttribute('class', 'brain-node');
@@ -1140,7 +1331,7 @@
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('class', 'brain-leader'); svg.appendChild(line);
         const el = document.createElement('div'); el.className = 'brain-tag'; labels.appendChild(el);
-        anchors.push({ dir, dot, line, el, op: 0, hidden: true, accent: (i === 2) });
+        anchors.push({ dir, dot, line, el, op: 0, hidden: true, accent: false });
       });
     }
 
@@ -1203,10 +1394,28 @@
           b = b * THRESH + (Math.random() - 0.5) * NOISE;
           b = Math.max(0, Math.min(255, b));
           if (b < 10) continue;
-          const ci = Math.floor((1 - b / 255) * (CHARSET.length - 1));
-          const it = b / 255;
-          ctx.fillStyle = `rgb(${TINT.r * it}, ${TINT.g * it}, ${TINT.b * it})`;
-          ctx.fillText(CHARSET[ci], x + RES / 2, y + RES / 2);
+          // Posterize into TONES hard bands (no smooth midtone gradient):
+          // each cell snaps to one of TONES discrete brightness levels.
+          const lvl = Math.min(TONES - 1, Math.floor((b / 255) * TONES));
+          // Top band's brightness is user-controlled; lower bands keep their step.
+          const it = (lvl === TONES - 1) ? HIGHLIGHT : (lvl + 1) / TONES;
+          const col = `rgb(${TINT.r * it}, ${TINT.g * it}, ${TINT.b * it})`;
+          const cx = x + RES / 2, cy = y + RES / 2;
+
+          if (MODE === 'halftone') {
+            // Uniform-size rings, never filled. Brightness drives the STROKE
+            // WEIGHT: highlights = thick bright rings, shadows = thin faint rings.
+            const rad = RES * 0.42;
+            ctx.lineWidth = Math.max(0.5, it * RES * 0.2);
+            ctx.strokeStyle = col;
+            ctx.beginPath();
+            ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+            ctx.stroke();
+          } else {
+            const ci = Math.floor((1 - it) * (CHARSET.length - 1));
+            ctx.fillStyle = col;
+            ctx.fillText(CHARSET[ci], cx, cy);
+          }
         }
       }
     }
@@ -1216,6 +1425,7 @@
       const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
       if (!isOpen) return;
       if (loaded) {
+        if (model) model.rotation.set(TILT.x, TILT.y, TILT.z);
         pivot.rotation.y += ROT_Y * dt;
         camera.position.z = baseDistance * ZOOM;
         camera.lookAt(0, 0, 0);
@@ -1239,6 +1449,61 @@
 
     closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) close(); });
+
+    // === TEMPORARY tuning panel wiring (remove once defaults are locked in) ===
+    (function wireControls() {
+      const CHARSETS = {
+        ascii:   "Ñ@#W$9876543210?!abc;:+=-,._ ",
+        blocks:  "█▓▒░ ",
+        binary:  "10 ",
+        minimal: "#*+-. ",
+      };
+      const hexToRgb = (hex) => {
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) }
+                 : { r: 255, g: 255, b: 255 };
+      };
+      const $ = (id) => document.getElementById(id);
+      const bind = (id, valId, fn, fixed) => {
+        const el = $(id); if (!el) return;
+        const vEl = valId ? $(valId) : null;
+        el.addEventListener('input', () => {
+          fn(el.value);
+          if (vEl) vEl.textContent = (fixed != null) ? (+el.value).toFixed(fixed) : el.value;
+        });
+      };
+
+      // One dropdown drives both the mode and (for ASCII) the character set.
+      bind('bd-style',   null,        v => {
+        if (v === 'halftone') { MODE = 'halftone'; }
+        else { MODE = 'ascii'; CHARSET = CHARSETS[v] || CHARSET; }
+      });
+      bind('bd-tint',    null,        v => { TINT = hexToRgb(v); });
+      bind('bd-tones',   'bd-tonesVal',    v => { TONES = parseInt(v); }, null);
+      bind('bd-highlight','bd-highlightVal', v => { HIGHLIGHT = parseFloat(v); }, 2);
+      bind('bd-res',      'bd-resVal',      v => { RES = parseInt(v); }, null);
+      bind('bd-contrast', 'bd-contrastVal', v => { CONTRAST = parseFloat(v); }, 1);
+      bind('bd-thresh',   'bd-threshVal',   v => { THRESH = parseFloat(v); }, 1);
+      bind('bd-shadow',   'bd-shadowVal',   v => { SHADOW_LIFT = parseInt(v); }, null);
+      bind('bd-noise',    'bd-noiseVal',    v => { NOISE = parseInt(v); }, null);
+      bind('bd-fps',      'bd-fpsVal',      v => { FPS = parseInt(v); }, null);
+      bind('bd-spin',     'bd-spinVal',     v => { ROT_Y = parseFloat(v); }, 2);
+      bind('bd-tiltx',    'bd-tiltxVal',    v => { TILT.x = parseFloat(v); }, 2);
+      bind('bd-tilty',    'bd-tiltyVal',    v => { TILT.y = parseFloat(v); }, 2);
+      bind('bd-tiltz',    'bd-tiltzVal',    v => { TILT.z = parseFloat(v); }, 2);
+      bind('bd-zoom',     'bd-zoomVal',     v => { ZOOM = parseFloat(v); }, 2);
+
+      const dump = $('bd-dump');
+      if (dump) dump.addEventListener('click', () => {
+        const tintHex = '#' + [TINT.r, TINT.g, TINT.b]
+          .map(n => n.toString(16).padStart(2, '0')).join('');
+        console.log('[brainAscii] current settings:', {
+          MODE, TONES, HIGHLIGHT, RES, NOISE, FPS, THRESH, CONTRAST, SHADOW_LIFT,
+          CHARSET, TINT: tintHex,
+          ROT_Y, TILT: { ...TILT }, ZOOM,
+        });
+      });
+    })();
 
     return { open, close, isOpen: () => isOpen };
   })();
