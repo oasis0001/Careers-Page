@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Wave — Audio Visualiser</title>
+<style>
+    :root {
+        --panel: rgba(16,16,18,0.72);
+        --border: rgba(255,255,255,0.10);
+        --text: #f4f4f6;
+        --muted: #8a8a92;
+        --accent: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0; height: 100%; overflow: hidden;
+        background: #000;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+    }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+
+    /* ---- Control panel ---- */
+    #panel {
+        position: fixed;
+        left: 24px; bottom: 24px;
+        width: 320px;
+        padding: 16px 18px 18px;
+        background: var(--panel);
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        z-index: 10;
+        user-select: none;
+        transition: opacity .4s ease;
+    }
+    #panel h1 {
+        margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .3px;
+    }
+    #panel .sub { margin: 0 0 14px; font-size: 11px; color: var(--muted); }
+
+    .drop {
+        border: 1px dashed rgba(255,255,255,0.22);
+        border-radius: 12px;
+        padding: 16px 12px;
+        text-align: center;
+        font-size: 12px; color: var(--muted);
+        cursor: pointer;
+        transition: border-color .2s, background .2s, color .2s;
+    }
+    .drop:hover, .drop.hover { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.04); color: var(--text); }
+    .drop strong { color: var(--text); font-weight: 600; }
+
+    .row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .track { font-size: 11.5px; color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    button.play {
+        width: 40px; height: 40px; flex: none;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: #fff; color: #000;
+        cursor: pointer;
+        display: grid; place-items: center;
+        transition: transform .15s, opacity .2s;
+    }
+    button.play:hover { transform: scale(1.06); }
+    button.play:disabled { opacity: .35; cursor: default; transform: none; }
+    button.play svg { width: 16px; height: 16px; }
+
+    .seek { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+    .seek input { flex: 1; }
+    .time { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 34px; }
+
+    input[type=range] {
+        -webkit-appearance: none; appearance: none;
+        height: 3px; border-radius: 3px;
+        background: rgba(255,255,255,0.18);
+        cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #fff; border: none;
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+    }
+
+    .vol { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+    .vol svg { width: 14px; height: 14px; opacity: .6; flex: none; }
+    .vol input { flex: 1; }
+
+    .hint {
+        position: fixed; top: 22px; left: 0; right: 0; text-align: center;
+        font-size: 11px; color: rgba(255,255,255,0.28); letter-spacing: .4px;
+        z-index: 5; pointer-events: none;
+    }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="hint">drag to look · scroll to zoom</div>
+
+<div id="panel">
+    <h1>Particle Wave</h1>
+    <p class="sub">Audio-reactive field</p>
+
+    <div class="drop" id="drop">
+        <strong>Drop an audio file</strong> or click to browse<br>
+        <span style="font-size:10.5px;">mp3 · wav · ogg · m4a</span>
+    </div>
+    <input type="file" id="file" accept="audio/*" hidden>
+
+    <div class="row">
+        <button class="play" id="play" disabled aria-label="Play">
+            <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+        <div class="track" id="track">No file loaded</div>
+    </div>
+
+    <div class="seek">
+        <span class="time" id="cur">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" disabled>
+        <span class="time" id="dur">0:00</span>
+    </div>
+
+    <div class="vol">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+        <input type="range" id="vol" min="0" max="100" value="85">
+    </div>
+</div>
+
+<audio id="audio" crossorigin="anonymous"></audio>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   SCENE
+   ============================================================ */
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 1);
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1200);
+
+// Low, near-the-surface camera looking across the field toward the horizon.
+// The whole grid sits in FRONT of the camera so nothing balloons up beside it.
+const camTarget = new THREE.Vector3(0, -2, -55);   // look DOWN: lower y = more downward tilt
+const camBase   = new THREE.Vector3(0, 24, 176);   // camera position: higher y = higher up
+camera.position.copy(camBase);
+camera.lookAt(camTarget);
+
+/* ============================================================
+   PARTICLE GRID
+   ============================================================ */
+const GRID_X = 300;          // columns (across)
+const GRID_Z = 340;          // rows (depth)
+const SPAN_X = 320;          // world width
+const SPAN_Z = 340;          // world depth, centred on origin (far edge -170, near +170)
+const COUNT  = GRID_X * GRID_Z;
+
+const positions = new Float32Array(COUNT * 3);
+const aGrid     = new Float32Array(COUNT * 2);   // normalized grid coords (u,v)
+const aRand     = new Float32Array(COUNT);       // per-point jitter
+
+let i3 = 0, i2 = 0, i1 = 0;
+for (let z = 0; z < GRID_Z; z++) {
+    for (let x = 0; x < GRID_X; x++) {
+        const u = x / (GRID_X - 1);
+        const v = z / (GRID_Z - 1);
+        // slight per-point jitter so the grid feels organic, not perfectly regular
+        const jx = (Math.random() - 0.5) * (SPAN_X / GRID_X) * 0.9;
+        const jz = (Math.random() - 0.5) * (SPAN_Z / GRID_Z) * 0.9;
+        positions[i3 + 0] = (u - 0.5) * SPAN_X + jx;
+        positions[i3 + 1] = 0;
+        positions[i3 + 2] = (v - 0.5) * SPAN_Z + jz;   // -SPAN/2 (far) .. +SPAN/2 (near)
+        aGrid[i2 + 0] = u;
+        aGrid[i2 + 1] = v;
+        aRand[i1]     = Math.random();
+        i3 += 3; i2 += 2; i1 += 1;
+    }
+}
+
+const geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geo.setAttribute('aGrid', new THREE.BufferAttribute(aGrid, 2));
+geo.setAttribute('aRand', new THREE.BufferAttribute(aRand, 1));
+
+/* ---- Audio frequency data uploaded as a 1D texture ---- */
+const FREQ_BINS = 256;
+const freqData  = new Uint8Array(FREQ_BINS);
+const freqSmooth = new Float32Array(FREQ_BINS);   // smoothed in JS for buttery motion
+const audioTex = new THREE.DataTexture(freqData, FREQ_BINS, 1, THREE.RedFormat, THREE.UnsignedByteType);
+audioTex.magFilter = THREE.LinearFilter;
+audioTex.minFilter = THREE.LinearFilter;
+audioTex.needsUpdate = true;
+
+/* ============================================================
+   SHADER MATERIAL  — wave displacement + photographic bokeh
+   ============================================================ */
+const uniforms = {
+    uTime:       { value: 0 },
+    uAudioTex:   { value: audioTex },
+    uLevel:      { value: 0 },          // overall smoothed loudness 0..1
+    uBass:       { value: 0 },
+    uSpanZ:      { value: SPAN_Z },
+    uSpanX:      { value: SPAN_X },
+    uFocus:      { value: 95 },         // focal distance (view space) — midground sharp
+    uAperture:   { value: 0.015 },      // bokeh strength (low = sharp)
+    uSize:       { value: 1.2 },        // base point size factor
+    uPixelRatio: { value: renderer.getPixelRatio() },
+};
+
+const vertexShader = /* glsl */`
+    uniform float uTime;
+    uniform sampler2D uAudioTex;
+    uniform float uLevel;
+    uniform float uBass;
+    uniform float uSpanZ;
+    uniform float uSpanX;
+    uniform float uFocus;
+    uniform float uAperture;
+    uniform float uSize;
+    uniform float uPixelRatio;
+
+    attribute vec2 aGrid;
+    attribute float aRand;
+
+    varying float vBright;
+    varying float vAlpha;
+
+    // cheap value noise
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+    float noise(vec2 p){
+        vec2 i = floor(p); vec2 f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i+vec2(0,0)), hash(i+vec2(1,0)), u.x),
+                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+    }
+
+    void main() {
+        vec3 p = position;
+        float t = uTime;
+
+        // depth envelope along the field. zN: 0 = far horizon, 1 = nearest the camera.
+        float zN = clamp((position.z + uSpanZ * 0.5) / uSpanZ, 0.0, 1.0);
+        // flatten the foreground so particles never rise up in front of the lens
+        float frontFlat = smoothstep(1.0, 0.78, zN);
+        // window the audio reaction to a tight central band (calm at front AND far edge)
+        float midBand = smoothstep(0.30, 0.48, zN) * smoothstep(0.80, 0.60, zN);
+        // ...and to the centre horizontally (calm at the left & right edges)
+        float centerX = smoothstep(0.40, 0.12, abs(position.x) / uSpanX);
+        midBand *= centerX;
+
+        // -------- rolling dune height field --------
+        float h = 0.0;
+        h += sin(p.x * 0.045 + t * 0.45) * cos(p.z * 0.05 - t * 0.30) * 3.4;
+        h += sin(p.x * 0.11  - t * 0.25) * 1.7;
+        h += cos(p.z * 0.09  + t * 0.40) * 1.9;
+        h += noise(p.xz * 0.06 + vec2(t * 0.06, -t * 0.04)) * 5.5;
+        h += noise(p.xz * 0.22) * 1.1;
+
+        // keep the static terrain low near the camera
+        h *= frontFlat;
+
+        // -------- audio reaction (middle band only) --------
+        // map frequency bins by distance from the centre line + a touch of x
+        float radial = length(vec2(p.x / uSpanX, (p.z) / uSpanZ));
+        float fi = fract(radial * 1.6 + aRand * 0.04);
+        float freq = texture2D(uAudioTex, vec2(fi, 0.5)).r;
+
+        // bass lifts the mid field, mids/highs add localized ripples — all windowed
+        float audioRipple = freq * (8.0 + uLevel * 10.0);
+        audioRipple *= 0.6 + 0.4 * sin(radial * 28.0 - t * 3.0);
+        float audio = (uBass * 5.0 + audioRipple) * midBand;
+
+        h += audio;
+        h *= (1.0 + uLevel * 0.35 * midBand);
+
+        p.y = h;
+
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        float depth = -mv.z;                       // view-space distance
+
+        // -------- depth of field (bokeh) --------
+        // a point in focus is tiny & bright; out of focus it grows and dims,
+        // because the same light is spread over a larger disc.
+        float persp = uSize * (230.0 / depth);            // perspective size (px, pre-DPR)
+        float coc   = abs(depth - uFocus) * uAperture;    // circle of confusion (px)
+        // shrink the very front so foreground dots stay small (0.35 near -> 1.0 by mid)
+        float shrink = mix(0.35, 1.0, smoothstep(6.0, 90.0, depth));
+        float sizePx = (persp + coc) * shrink;
+        gl_PointSize = clamp(sizePx * uPixelRatio, 0.0, 8.0 * uPixelRatio);
+
+        // brightness ~ in-focus energy / spread area (dims as the disc grows).
+        // use the optical size (persp+coc), not the shrunk size, so the front-shrink
+        // only affects dot size, not brightness.
+        float optical = persp + coc;
+        float focusBright = (persp * persp) / (optical * optical);
+
+        // crests of the waves catch more light
+        float crest = smoothstep(-3.0, 8.0, h);
+
+        // keep each point fairly dim so additive accumulation reads as soft greys,
+        // not a blown-out white sheet, but bright enough to register on black.
+        vBright = focusBright * (0.30 + 0.60 * crest);
+        vBright += freq * crest * 0.40;                    // audio sparkle on peaks
+
+        // far horizon dissolves to black; very near edge fades in softly
+        float far  = smoothstep(360.0, 190.0, depth);
+        float near = smoothstep(2.0, 16.0, depth);
+        vAlpha = clamp(far * near, 0.0, 1.0);
+
+        gl_Position = projectionMatrix * mv;
+    }
+`;
+
+const fragmentShader = /* glsl */`
+    precision highp float;
+    varying float vBright;
+    varying float vAlpha;
+
+    void main() {
+        // crisp filled disc — sharp dots with just a 1px antialiased edge
+        vec2 c = gl_PointCoord - 0.5;
+        float dist = length(c);
+        float a = 1.0 - smoothstep(0.40, 0.50, dist);
+
+        float b = vBright;
+        vec3 col = vec3(0.92, 0.94, 0.97) * b;
+
+        gl_FragColor = vec4(col, a * vAlpha * clamp(b, 0.0, 1.0));
+    }
+`;
+
+const material = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+});
+
+const points = new THREE.Points(geo, material);
+scene.add(points);
+
+/* ============================================================
+   AUDIO
+   ============================================================ */
+const audioEl = document.getElementById('audio');
+let audioCtx, analyser, srcNode, gainNode;
+let audioReady = false;
+
+function initAudio() {
+    if (audioReady) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    srcNode = audioCtx.createMediaElementSource(audioEl);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;                 // -> 512 bins, we read first FREQ_BINS
+    analyser.smoothingTimeConstant = 0.20;   // [SMOOTHNESS 1/3] 0..0.95 — higher = smoother
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = parseFloat(volEl.value) / 100;
+    srcNode.connect(analyser);
+    analyser.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    audioReady = true;
+}
+
+let levelSmooth = 0, bassSmooth = 0;
+
+function sampleAudio() {
+    if (!audioReady || audioEl.paused) {
+        // ease everything back to rest when paused/idle
+        for (let i = 0; i < FREQ_BINS; i++) freqSmooth[i] += (0 - freqSmooth[i]) * 0.05;
+        levelSmooth += (0 - levelSmooth) * 0.04;
+        bassSmooth  += (0 - bassSmooth)  * 0.04;
+    } else {
+        analyser.getByteFrequencyData(freqData); // length 512; we use [0..256)
+        let sum = 0, bass = 0;
+        for (let i = 0; i < FREQ_BINS; i++) {
+            const v = freqData[i] / 255;
+            // [SMOOTHNESS 2/3] per-bin easing — LOWER = smoother/slower, higher = snappier
+            freqSmooth[i] += (v - freqSmooth[i]) * 0.22;
+            sum += freqSmooth[i];
+            if (i < 24) bass += freqSmooth[i];
+        }
+        const level = sum / FREQ_BINS;
+        const bassAvg = bass / 24;
+        // [SMOOTHNESS 3/3] overall level/bass easing — LOWER = smoother/slower
+        levelSmooth += (level - levelSmooth) * 0.78;
+        bassSmooth  += (bassAvg - bassSmooth) * 0.92;
+    }
+
+    // write smoothed values into the texture for the shader
+    for (let i = 0; i < FREQ_BINS; i++) {
+        freqData[i] = Math.min(255, freqSmooth[i] * 255);
+    }
+    audioTex.needsUpdate = true;
+    uniforms.uLevel.value = levelSmooth;
+    uniforms.uBass.value  = bassSmooth;
+}
+
+/* ============================================================
+   UI WIRING
+   ============================================================ */
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const playBtn = document.getElementById('play');
+const iconPlay = document.getElementById('icon-play');
+const iconPause = document.getElementById('icon-pause');
+const trackEl = document.getElementById('track');
+const seek = document.getElementById('seek');
+const curEl = document.getElementById('cur');
+const durEl = document.getElementById('dur');
+const volEl = document.getElementById('vol');
+const panel = document.getElementById('panel');
+
+function fmt(s) {
+    if (!isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+    return m + ':' + String(ss).padStart(2, '0');
+}
+
+function loadFile(file) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    audioEl.src = url;
+    trackEl.textContent = file.name;
+    playBtn.disabled = false;
+    seek.disabled = false;
+    audioEl.load();
+}
+
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+
+['dragenter', 'dragover'].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave', 'drop'].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
+drop.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('audio')) loadFile(f);
+});
+// allow dropping anywhere on the window too
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('audio')) loadFile(f);
+});
+
+playBtn.addEventListener('click', async () => {
+    initAudio();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    if (audioEl.paused) audioEl.play(); else audioEl.pause();
+});
+
+audioEl.addEventListener('play', () => { iconPlay.style.display = 'none'; iconPause.style.display = ''; });
+audioEl.addEventListener('pause', () => { iconPlay.style.display = ''; iconPause.style.display = 'none'; });
+audioEl.addEventListener('loadedmetadata', () => { durEl.textContent = fmt(audioEl.duration); });
+audioEl.addEventListener('timeupdate', () => {
+    if (!seek.matches(':active')) seek.value = (audioEl.currentTime / audioEl.duration) * 1000 || 0;
+    curEl.textContent = fmt(audioEl.currentTime);
+});
+audioEl.addEventListener('ended', () => { iconPlay.style.display = ''; iconPause.style.display = 'none'; });
+
+seek.addEventListener('input', () => {
+    if (audioEl.duration) audioEl.currentTime = (seek.value / 1000) * audioEl.duration;
+});
+volEl.addEventListener('input', () => {
+    if (gainNode) gainNode.gain.value = volEl.value / 100;
+    audioEl.volume = volEl.value / 100;
+});
+
+/* ============================================================
+   CAMERA INTERACTION  — drag to look, scroll to zoom, idle drift
+   ============================================================ */
+let dragging = false, px = 0, py = 0;
+let yaw = 0, pitch = 0, zoom = 0;
+let yawT = 0, pitchT = 0, zoomT = 0;
+
+renderer.domElement.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; });
+window.addEventListener('pointerup', () => dragging = false);
+window.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    yawT   += (e.clientX - px) * 0.0016;
+    pitchT += (e.clientY - py) * 0.0012;
+    pitchT = Math.max(-0.35, Math.min(0.5, pitchT));
+    px = e.clientX; py = e.clientY;
+});
+renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomT = Math.max(-2, Math.min(60, zoomT + e.deltaY * 0.03));
+}, { passive: false });
+
+/* ============================================================
+   RENDER LOOP
+   ============================================================ */
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+    uniforms.uTime.value = t;
+
+    sampleAudio();
+
+    // ease camera toward targets + subtle idle drift
+    yaw   += (yawT - yaw) * 0.06;
+    pitch += (pitchT - pitch) * 0.06;
+    zoom  += (zoomT - zoom) * 0.06;
+
+    const driftX = Math.sin(t * 0.10) * 3.0;
+    const driftY = Math.cos(t * 0.13) * 1.0;
+
+    camera.position.x = camBase.x + driftX + Math.sin(yaw) * 24;
+    camera.position.y = camBase.y + driftY + pitch * 16;
+    // never drift/zoom past the front edge of the field (z = +SPAN_Z/2 = 170)
+    camera.position.z = Math.max(172, camBase.z + zoom);
+    camera.lookAt(camTarget.x + Math.sin(yaw) * 10, camTarget.y + pitch * 6, camTarget.z);
+
+    renderer.render(scene, camera);
+}
+animate();
+
+/* ============================================================
+   RESIZE
+   ============================================================ */
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    uniforms.uPixelRatio.value = renderer.getPixelRatio();
+});
+</script>
+</body>
+</html>

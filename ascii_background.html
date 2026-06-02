@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animated ASCII Background — Organic Shape</title>
+<style>
+    :root {
+        --panel: rgba(16,16,18,0.72);
+        --border: rgba(255,255,255,0.10);
+        --text: #f4f4f6;
+        --muted: #8a8a92;
+        --accent: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0; height: 100%; overflow: hidden;
+        background: #000;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+    }
+    /* full-bleed background canvas */
+    #bg { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+
+    /* ---- Control panel (glassmorphic, matches audio_visualizer) ---- */
+    #panel {
+        position: fixed;
+        left: 24px; top: 24px;
+        width: 300px;
+        padding: 16px 18px 18px;
+        background: var(--panel);
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        z-index: 10;
+        user-select: none;
+        transition: opacity .35s ease, transform .35s ease;
+        max-height: calc(100vh - 48px);
+        overflow-y: auto;
+    }
+    #panel::-webkit-scrollbar { width: 6px; }
+    #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+    #panel.collapsed { transform: translateX(calc(-100% - 24px)); opacity: 0; }
+
+    #panel h1 { margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .3px; }
+    #panel .sub { margin: 0 0 14px; font-size: 11px; color: var(--muted); }
+
+    .group { margin-top: 14px; }
+    .group:first-of-type { margin-top: 4px; }
+    .head {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+        color: var(--muted); font-weight: 600; margin-bottom: 7px;
+    }
+    .val { color: var(--text); font-variant-numeric: tabular-nums; }
+
+    input[type=range] {
+        -webkit-appearance: none; appearance: none; width: 100%;
+        height: 3px; border-radius: 3px;
+        background: rgba(255,255,255,0.18); cursor: pointer; outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #fff; border: none;
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+    }
+    select, input[type=color] {
+        width: 100%; padding: 7px 10px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border); color: var(--text);
+        border-radius: 8px; outline: none; font-family: inherit;
+        font-size: 12px; cursor: pointer;
+    }
+    input[type=color] { height: 34px; padding: 2px 4px; }
+
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .toggle-row label { font-size: 12px; color: var(--muted); cursor: pointer; }
+    .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex: none; cursor: pointer; }
+    .switch input { display: none; }
+    .switch .slot {
+        position: absolute; inset: 0; border-radius: 999px;
+        background: rgba(255,255,255,0.14); transition: background .2s;
+    }
+    .switch .knob {
+        position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+        border-radius: 50%; background: #fff; transition: transform .2s;
+    }
+    .switch input:checked + .slot { background: rgba(255,255,255,0.55); }
+    .switch input:checked + .slot .knob { transform: translateX(16px); }
+
+    /* hamburger to reopen panel */
+    #reopen {
+        position: fixed; left: 24px; top: 24px; z-index: 9;
+        width: 40px; height: 40px; border-radius: 12px;
+        background: var(--panel); border: 1px solid var(--border);
+        backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+        display: grid; place-items: center; cursor: pointer;
+        opacity: 0; pointer-events: none; transition: opacity .35s ease;
+    }
+    #reopen.show { opacity: 1; pointer-events: auto; }
+    #reopen svg { width: 18px; height: 18px; }
+
+    .hint {
+        position: fixed; bottom: 22px; left: 0; right: 0; text-align: center;
+        font-size: 11px; color: rgba(255,255,255,0.22); letter-spacing: .4px;
+        z-index: 5; pointer-events: none;
+    }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<div id="reopen" title="Show controls">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+</div>
+
+<div id="panel">
+    <h1>ASCII Field</h1>
+    <p class="sub">Animated organic glyph cloud</p>
+
+    <div class="group">
+        <div class="head"><span>Character Set</span></div>
+        <select id="charset">
+            <option value="dense">Dense (Ñ@#W...)</option>
+            <option value="code">Code soup (&lt;/&gt;{}[]...)</option>
+            <option value="blocks">Block pixels (█▓▒░)</option>
+            <option value="binary">Binary (1 0)</option>
+            <option value="squares" selected>Dot Matrix (■ ▪ ·)</option>
+            <option value="minimal">Minimal (+ - .)</option>
+        </select>
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Tint</span></div>
+        <input type="color" id="tint" value="#D1D1D1">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Opacity</span><span id="opacityVal" class="val">0.3</span></div>
+        <input type="range" id="opacity" min="0.02" max="0.6" step="0.01" value="0.3">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Density (grid px)</span><span id="cellVal" class="val">6</span></div>
+        <input type="range" id="cell" min="3" max="20" step="1" value="6">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Block Size</span><span id="gscaleVal" class="val">0.55</span></div>
+        <input type="range" id="gscale" min="0.2" max="1.2" step="0.05" value="0.55">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Shape Scale</span><span id="scaleVal" class="val">1.8</span></div>
+        <input type="range" id="scale" min="0.5" max="1.8" step="0.05" value="1.8">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Detail</span><span id="detailVal" class="val">1.9</span></div>
+        <input type="range" id="detail" min="0.8" max="5.0" step="0.1" value="1.9">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Edge Wobble</span><span id="wobbleVal" class="val">1</span></div>
+        <input type="range" id="wobble" min="0" max="1" step="0.01" value="1">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Morph Speed</span><span id="morphVal" class="val">1.5</span></div>
+        <input type="range" id="morph" min="0" max="1.5" step="0.05" value="1.5">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Drift Speed</span><span id="driftVal" class="val">2.5</span></div>
+        <input type="range" id="drift" min="0" max="6" step="0.1" value="2.5">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Flicker</span><span id="flickerVal" class="val">0.15</span></div>
+        <input type="range" id="flicker" min="0" max="1" step="0.01" value="0.15">
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Frame Rate (fps)</span><span id="fpsVal" class="val">60</span></div>
+        <input type="range" id="fps" min="6" max="60" step="1" value="60">
+    </div>
+
+    <div class="toggle-row">
+        <label class="switch"><input type="checkbox" id="follow" checked><span class="slot"><span class="knob"></span></span></label>
+        <label for="follow">Follow cursor</label>
+    </div>
+
+    <div class="group">
+        <div class="head"><span>Follow Lag</span><span id="lagVal" class="val">0.02</span></div>
+        <input type="range" id="lag" min="0.01" max="0.25" step="0.01" value="0.02">
+    </div>
+
+    <div class="toggle-row">
+        <label class="switch"><input type="checkbox" id="invert"><span class="slot"><span class="knob"></span></span></label>
+        <label for="invert">Invert (glyphs outside shape)</label>
+    </div>
+
+    <div class="toggle-row" style="margin-top:18px; justify-content:flex-end;">
+        <label id="hide" style="cursor:pointer;">Hide panel ×</label>
+    </div>
+</div>
+
+<div class="hint">an organic ascii field · drag the sliders to tune</div>
+
+<script>
+/* ============================================================
+   CANVAS
+   ============================================================ */
+const canvas = document.getElementById('bg');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let W = 0, H = 0, DPR = 1;
+function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width  = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+/* ============================================================
+   VALUE NOISE  (smooth, hash-based) + fbm
+   ============================================================ */
+function hash(x, y) {
+    let n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+}
+function smooth(t) { return t * t * (3 - 2 * t); }
+function noise2(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const ux = smooth(fx), uy = smooth(fy);
+    const a = hash(ix, iy),     b = hash(ix + 1, iy);
+    const c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+    return a * (1 - ux) * (1 - uy) + b * ux * (1 - uy)
+         + c * (1 - ux) * uy        + d * ux * uy;
+}
+function fbm(x, y, oct) {
+    let v = 0, amp = 0.5, freq = 1, norm = 0;
+    for (let i = 0; i < oct; i++) {
+        v += amp * noise2(x * freq, y * freq);
+        norm += amp;
+        amp *= 0.5; freq *= 2.0;
+    }
+    return v / norm;
+}
+
+/* ============================================================
+   CHARACTER SETS  (dark -> light ordering: index 0 = brightest glyph)
+   ============================================================ */
+const charSets = {
+    dense:   "Ñ@#W$9876543210?!abc;:+=-,._ ",
+    code:    "</>{}[]()=+*&^%$#@!?;:~_- ",
+    blocks:  "█▓▒░ ",
+    binary:  "10 ",
+    // halftone dot-matrix: a single square glyph that sits smaller than the cell,
+    // leaving black gaps -> reads as a grid of squares (like the reference zoom).
+    // dense -> light: big square, small square, middle dot, space.
+    squares: "■▪·· ",
+    minimal: "#*+=-:. "
+};
+
+/* ============================================================
+   CONTROLS
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const C = {
+    charset: $('charset'), tint: $('tint'),
+    opacity: $('opacity'), cell: $('cell'), gscale: $('gscale'), scale: $('scale'),
+    detail: $('detail'), wobble: $('wobble'), morph: $('morph'),
+    drift: $('drift'), flicker: $('flicker'), fps: $('fps'), invert: $('invert'),
+    follow: $('follow'), lag: $('lag')
+};
+// live value labels
+[['opacity','opacityVal'],['cell','cellVal'],['gscale','gscaleVal'],['scale','scaleVal'],
+ ['detail','detailVal'],['wobble','wobbleVal'],['morph','morphVal'],
+ ['drift','driftVal'],['flicker','flickerVal'],['fps','fpsVal'],
+ ['lag','lagVal']].forEach(([inp, lbl]) => {
+    C[inp].addEventListener('input', e => $(lbl).textContent = e.target.value);
+});
+
+function hexToRgb(hex) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return m ? { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) }
+             : { r: 255, g: 255, b: 255 };
+}
+
+// panel show/hide
+const panel = $('panel'), reopen = $('reopen');
+$('hide').addEventListener('click', () => { panel.classList.add('collapsed'); reopen.classList.add('show'); });
+reopen.addEventListener('click', () => { panel.classList.remove('collapsed'); reopen.classList.remove('show'); });
+
+/* ============================================================
+   ORGANIC SHAPE FIELD
+   Returns 0..1 "inside-ness" for a normalized point, morphing in time.
+   A soft amoeba: radial falloff whose radius is modulated by angular
+   noise + a couple of slow-drifting lobes, then warped by fbm so the
+   interior breaks up into the cloudy texture seen in the reference.
+   ============================================================ */
+function shapeField(nx, ny, t, scale, detail, wobble, cx, cy) {
+    // aspect-corrected screen coords — these stay FIXED to the screen
+    const aspect = W / H;
+    const sx = (nx - 0.5) * aspect;
+    const sy = (ny - 0.5);
+
+    // MASK coords: the silhouette is shifted by (cx,cy) so the mask itself moves /
+    // follows the cursor, while the texture below stays anchored to the screen.
+    const mx = sx - cx;
+    const my = sy - cy;
+
+    const ang = Math.atan2(my, mx);
+    let r = Math.hypot(mx, my) / (0.34 * scale);
+
+    // wobbling organic boundary (several angular harmonics, animated)
+    const edge =
+        Math.sin(ang * 3.0 + t * 0.6) * 0.10 +
+        Math.sin(ang * 5.0 - t * 0.4) * 0.06 +
+        Math.sin(ang * 2.0 + t * 0.25) * 0.12;
+    r += edge * wobble;
+
+    // domain-warped fbm makes the silhouette ragged — travels WITH the mask
+    const warp = fbm(mx * 1.6 * detail + t * 0.15, my * 1.6 * detail - t * 0.12, 4);
+    r += (warp - 0.5) * 0.9 * wobble;
+
+    // soft inside mask (this is the thing that moves / follows the cursor)
+    let mask = 1.0 - smoothstepf(0.55, 1.15, r);
+
+    // internal cloud texture — sampled from the FIXED screen coords, so the glyph
+    // field underneath stays put and the moving mask reveals different parts of it.
+    const tex = fbm(sx * 3.2 * detail - t * 0.2, sy * 3.2 * detail + t * 0.18, 5);
+    let v = mask * (0.35 + 0.85 * tex);
+
+    return Math.max(0, Math.min(1, v));
+}
+function smoothstepf(a, b, x) {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+}
+
+/* ============================================================
+   POINTER TRACKING  — target offset the blob eases toward when Follow is on
+   ============================================================ */
+let mouseX = window.innerWidth / 2;
+let mouseY = window.innerHeight / 2;
+window.addEventListener('pointermove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+
+/* ============================================================
+   RENDER LOOP
+   ============================================================ */
+let lastDraw = 0;
+let t0 = performance.now();
+// persistent eased center — smoothly chases its target so motion has a delay
+let curX = 0, curY = 0;
+
+function draw(now) {
+    requestAnimationFrame(draw);
+
+    const fps = parseInt(C.fps.value, 10);
+    const interval = 1000 / fps;
+    if (now - lastDraw < interval) return;
+    lastDraw = now;
+
+    const elapsed = (now - t0) / 1000;
+    const t = elapsed * parseFloat(C.morph.value);
+
+    // non-repeating wander across the whole screen (Lissajous). Driven by its own
+    // real-time clock scaled by the Drift Speed slider, independent of Morph Speed.
+    // Amplitudes are wide enough to reach the top/bottom/left/right edges + center.
+    const AMP_X = 0.70;   // ← horizontal reach (width).  bigger = wider travel
+    const AMP_Y = 0.44;   // ← vertical reach (height).   bigger = taller travel
+    const dt = elapsed * parseFloat(C.drift.value);
+
+    // the organic wander — ALWAYS running, so the blob keeps drifting on its own.
+    const wanderX = (Math.sin(dt * 0.047) * 0.75 + Math.sin(dt * 0.019) * 0.25) * AMP_X;
+    const wanderY = (Math.cos(dt * 0.039) * 0.74 + Math.sin(dt * 0.026) * 0.26) * AMP_Y;
+
+    // anchor point that the wander happens AROUND: screen centre normally, or the
+    // cursor when Follow is on. eased so it trails the pointer with a delay.
+    const aspect = W / H;
+    let anchorX = 0, anchorY = 0, wanderScale = 1.0;
+    if (C.follow.checked) {
+        anchorX = (mouseX / W - 0.5) * aspect;
+        anchorY = (mouseY / H - 0.5);
+        wanderScale = 0.45;                      // smaller roam so it hovers near the cursor
+    }
+    const k = 1 - Math.pow(1 - parseFloat(C.lag.value), 60 / fps);
+    curX += (anchorX - curX) * k;
+    curY += (anchorY - curY) * k;
+
+    // final centre = eased anchor + organic wander around it
+    const cx = curX + wanderX * wanderScale;
+    const cy = curY + wanderY * wanderScale;
+
+    const cell    = parseInt(C.cell.value, 10);
+    const opacity = parseFloat(C.opacity.value);
+    const scale   = parseFloat(C.scale.value);
+    const detail  = parseFloat(C.detail.value);
+    const wobble  = parseFloat(C.wobble.value);
+    const flicker = parseFloat(C.flicker.value);
+    const invert  = C.invert.checked;
+    const density = charSets[C.charset.value];
+    const tint    = hexToRgb(C.tint.value);
+
+    // clear to pure black
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    // GLYPH_SCALE = how big each glyph is drawn relative to its cell (Block Size slider).
+    // 1.0 = fills the cell (big squares, no gaps). Lower = smaller squares / bigger gaps.
+    const GLYPH_SCALE = parseFloat(C.gscale.value);
+    ctx.font = `${cell * GLYPH_SCALE}px "SF Mono", "Menlo", Consolas, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const cols = Math.ceil(W / cell);
+    const rows = Math.ceil(H / cell);
+
+    for (let gy = 0; gy < rows; gy++) {
+        const py = gy * cell + cell * 0.5;
+        const ny = py / H;
+        for (let gx = 0; gx < cols; gx++) {
+            const px = gx * cell + cell * 0.5;
+            const nx = px / W;
+
+            let v = shapeField(nx, ny, t, scale, detail, wobble, cx, cy);
+            if (invert) v = 1 - v;
+
+            // animated per-cell flicker so the field shimmers
+            if (flicker > 0) {
+                v += (Math.random() - 0.5) * flicker * 0.6;
+            }
+            v = Math.max(0, Math.min(1, v));
+
+            if (v < 0.06) continue; // true blacks -> skip (cheap + crisp)
+
+            // brightest glyph at index 0 -> map high v to low index
+            const ci = Math.floor((1 - v) * (density.length - 1));
+            const ch = density[ci];
+            if (ch === ' ') continue;
+
+            const a = (opacity * v * v).toFixed(3); // square keeps it subtle, low-opacity
+            ctx.fillStyle = `rgba(${tint.r},${tint.g},${tint.b},${a})`;
+            ctx.fillText(ch, px, py);
+        }
+    }
+}
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

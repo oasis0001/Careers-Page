@@ -6,7 +6,7 @@
 <title>The Ideal Candidate</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Inter+Tight:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
   @font-face {
     font-family: 'TASA Orbiter Display';
@@ -43,21 +43,20 @@
     position: relative;
     width: 1440px;
     height: 750px;
+    flex: none;               /* keep the 1440×750 design size — only transform:scale() resizes it */
     transform-origin: center center;
     background: var(--bg);
     overflow: hidden;
     user-select: none;
   }
 
-  /* Background ASCII pattern */
+  /* Animated ASCII field background (organic drifting glyph cloud) */
   .bg-ascii {
     position: absolute;
     inset: 0;
-    background-image: url('assets/ascii-art.png');
-    background-size: cover;
-    background-position: center;
-    opacity: 0.18;
-    mix-blend-mode: exclusion;
+    width: 100%;
+    height: 100%;
+    display: block;
     pointer-events: none;
   }
   .bg-vignette {
@@ -80,45 +79,29 @@
     display: block;
   }
 
-  /* Title — "The Ideal" */
-  .title-the {
+  /* Title — "the Ideal Candidate" (single line, anchored to the bottom) */
+  .title-main {
     position: absolute;
-    left: 120px;
-    top: 95px;
-    font-family: 'TASA Orbiter Display', 'TASA Orbiter', system-ui, sans-serif;
-    color: var(--text-muted);
-    font-weight: 400;
-    font-size: 112px;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-family: 'Inter Tight', system-ui, sans-serif;
+    font-weight: 300;
+    color: var(--text);
+    opacity: 0.82;
+    font-size: 145px;
     line-height: 0.9;
-    letter-spacing: -5.5px;
+    letter-spacing: -7.2px;
     z-index: 3;
   }
-  .title-the .ideal {
-    display: block;
-    margin-left: 80px;
-    margin-top: 4px;
-    color: var(--text);
+  .title-main .t-the {
     font-family: 'Instrument Serif', serif;
     font-style: italic;
     font-weight: 400;
-    font-size: 133px;
+    font-size: 161px;
     letter-spacing: -3px;
-  }
-
-  /* Title — "Candidate" */
-  .title-candidate {
-    position: absolute;
-    left: 50%;
-    top: 460px;
-    transform: translateX(-50%);
-    font-family: 'TASA Orbiter Display', 'TASA Orbiter', system-ui, sans-serif;
-    font-weight: 400;
-    color: var(--text);
-    font-size: 112px;
-    line-height: 0.9;
-    letter-spacing: -5.5px;
-    white-space: nowrap;
-    z-index: 3;
+    margin-right: 28px;
   }
 
   /* Feature reveal */
@@ -186,10 +169,11 @@
     position: absolute;
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 400;
-    font-size: 14.5px;
+    font-size: 17px;
     color: var(--text);
-    letter-spacing: -0.29px;
+    letter-spacing: -0.34px;
     line-height: 1;
+    text-transform: uppercase;
     opacity: 0;
     white-space: nowrap;
     transition: opacity 260ms ease-out, transform 260ms ease-out;
@@ -359,16 +343,19 @@
     letter-spacing: 0.3px;
     line-height: 1;
     text-transform: uppercase;
-    color: #ffffff;
+    color: #0a0a0a;                          /* dark text on the light box */
     white-space: nowrap;
     padding: 5px 11px;
-    background: rgba(1, 1, 3, 0.5);
+    background: rgba(196, 196, 198, 0.82);   /* light frosted-grey box, like the reference */
+    backdrop-filter: blur(3px) saturate(110%);
+    -webkit-backdrop-filter: blur(3px) saturate(110%);
     opacity: 0;
     will-change: transform, opacity;
   }
 
   /* === Brain dither tuning panel (temporary) === */
   #brainDitherControls {
+    display: none !important;   /* hidden from view (dev tuning panel) */
     position: absolute;
     top: 0;
     left: 0;
@@ -449,17 +436,114 @@
     font-family: inherit;
   }
   #brainDitherControls .bd-dump:hover { background: #2563eb; }
+
+  /* === Audio Visualiser overlay (particle wave) — MOUTH === */
+  #audioViz-overlay {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  #audioViz-overlay.inside-audioViz {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #audioVizCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  /* Glassy control panel */
+  #audioVizPanel {
+    position: absolute;
+    left: 28px;
+    bottom: 28px;
+    width: 300px;
+    padding: 16px 18px 18px;
+    background: rgba(16, 16, 18, 0.72);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    z-index: 2;
+    user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #f4f4f6;
+  }
+  #audioVizPanel h1 { margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .3px; }
+  #audioVizPanel .av-sub { margin: 0 0 14px; font-size: 11px; color: #8a8a92; }
+  #audioVizPanel .av-drop {
+    border: 1px dashed rgba(255, 255, 255, 0.22);
+    border-radius: 12px;
+    padding: 16px 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #8a8a92;
+    cursor: pointer;
+    transition: border-color .2s, background .2s, color .2s;
+  }
+  #audioVizPanel .av-drop:hover,
+  #audioVizPanel .av-drop.hover { border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.04); color: #f4f4f6; }
+  #audioVizPanel .av-drop strong { color: #f4f4f6; font-weight: 600; }
+  #audioVizPanel .av-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  #audioVizPanel .av-track { font-size: 11.5px; color: #8a8a92; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #audioVizPanel button.av-play {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: #fff;
+    color: #000;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: transform .15s, opacity .2s;
+  }
+  #audioVizPanel button.av-play:hover { transform: scale(1.06); }
+  #audioVizPanel button.av-play:disabled { opacity: .35; cursor: default; transform: none; }
+  #audioVizPanel button.av-play svg { width: 16px; height: 16px; }
+  #audioVizPanel .av-seek { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  #audioVizPanel .av-seek input { flex: 1; }
+  #audioVizPanel .av-time { font-size: 10.5px; color: #8a8a92; font-variant-numeric: tabular-nums; min-width: 34px; }
+  #audioVizPanel input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.18);
+    cursor: pointer;
+  }
+  #audioVizPanel input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  }
+  #audioVizPanel .av-vol { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  #audioVizPanel .av-vol svg { width: 14px; height: 14px; opacity: .6; flex: none; }
+  #audioVizPanel .av-vol input { flex: 1; }
 </style>
 </head>
 <body>
 <div class="scale-wrap">
   <div class="stage" id="stage">
+    <canvas class="bg-ascii" id="asciiBgCanvas" aria-hidden="true"></canvas>
     <div class="bg-vignette"></div>
 
     <canvas class="statue" id="statueCanvas" aria-hidden="true"></canvas>
 
-    <div class="title-the">The<span class="ideal">Ideal</span></div>
-    <div class="title-candidate">Candidate</div>
+    <div class="title-main"><span class="t-the">the</span>Ideal Candidate</div>
 
     <!-- ====== Feature: HEAD / Forehead ====== -->
     <div class="feature" id="feat-head">
@@ -479,7 +563,7 @@
         <path d="M0.02 0.27 L117.91 10.61 L259.82 10.61" style="--len: 260.2;" />
       </svg>
 
-      <div class="text" style="left:980px; top:132px;">WHO THINKS ONLY AI</div>
+      <div class="text" style="left:980px; top:132px;">Makes AI their thinking partner.</div>
     </div>
 
     <!-- ====== Feature: EYE / Face ====== -->
@@ -500,7 +584,7 @@
         <path d="M0.12 0.24 L142.06 72.72 L381.11 72.72" style="--len: 398.4;" />
       </svg>
 
-      <div class="text" style="left:935px; top:324px;">WHO SEES AI EVERYWHERE</div>
+      <div class="text" style="left:935px; top:324px;">Decodes the world through an AI lens</div>
     </div>
 
     <!-- ====== Feature: MOUTH ====== -->
@@ -521,7 +605,7 @@
         <path d="M397 2 L0 2" style="--len: 397;" />
       </svg>
 
-      <div class="text" style="left:222px; top:372px;">WHO TALKS ONLY AI</div>
+      <div class="text" style="left:222px; top:372px;">Translates objectives into perfect prompts</div>
     </div>
 
     <!-- Hover trigger zones (transparent) -->
@@ -529,7 +613,6 @@
     <div class="hover-zone" data-target="eye"   style="left:668px; top:228px; width:90px;  height:82px;"></div>
     <div class="hover-zone" data-target="mouth" style="left:610px; top:363px; width:104px; height:50px;"></div>
 
-    <div class="hint">Hover head · eye · mouth — click EYE to dive · click HEAD for the mind</div>
 
     <!-- ===== 3D "Inside the Brain" overlay (shatter-dive void) — EYE ===== -->
     <div id="brain-overlay">
@@ -633,6 +716,45 @@
 
         <button class="bd-dump" id="bd-dump">Log current values to console</button>
       </div>
+    </div>
+
+    <!-- ===== Audio Visualiser scene (audio-reactive particle wave) — MOUTH ===== -->
+    <div id="audioViz-overlay">
+      <canvas id="audioVizCanvas"></canvas>
+      <div class="brain-vignette"></div>
+
+      <div id="audioVizPanel">
+        <h1>Particle Wave</h1>
+        <p class="av-sub">Audio-reactive field</p>
+
+        <div class="av-drop" id="av-drop">
+          <strong>Drop an audio file</strong> or click to browse<br>
+          <span style="font-size:10.5px;">mp3 · wav · ogg · m4a</span>
+        </div>
+        <input type="file" id="av-file" accept="audio/*" hidden>
+
+        <div class="av-row">
+          <button class="av-play" id="av-play" disabled aria-label="Play">
+            <svg id="av-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="av-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+          </button>
+          <div class="av-track" id="av-track">No file loaded</div>
+        </div>
+
+        <div class="av-seek">
+          <span class="av-time" id="av-cur">0:00</span>
+          <input type="range" id="av-seek" min="0" max="1000" value="0" disabled>
+          <span class="av-time" id="av-dur">0:00</span>
+        </div>
+
+        <div class="av-vol">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+          <input type="range" id="av-vol" min="0" max="100" value="85">
+        </div>
+      </div>
+
+      <audio id="av-audio" crossorigin="anonymous"></audio>
+      <div class="btn-close-brain" style="position: absolute; top: 30px; right: 40px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); cursor: pointer; border: 1px solid rgba(255,255,255,0.15); padding: 8px 16px; letter-spacing: 1px;">[ EXIT_VOICE ]</div>
     </div>
   </div>
 </div>
@@ -828,6 +950,7 @@
     let composer = null, blurPass = null;
     if (THREE.EffectComposer && THREE.RenderPass && THREE.ShaderPass) {
       composer = new THREE.EffectComposer(renderer);
+      composer.setPixelRatio(renderer.getPixelRatio());   // match renderer res → sharp, not upscaled
       composer.setSize(W, H);
       composer.addPass(new THREE.RenderPass(scene, camera));
       blurPass = new THREE.ShaderPass(RadialBlurCAShader);
@@ -836,67 +959,265 @@
     }
     function setBlur(v) { if (blurPass) blurPass.uniforms.uStrength.value = v; }
 
-    // ---- THE VOID: multi-axis architectural grids (faint blue) ----
-    const GRID_MAIN = 0x1a56ff;
-    const GRID_SUB  = 0x16265a;
-    function gridLayer(size, divisions, opacity, position, rotation) {
-      const g = new THREE.GridHelper(size, divisions, GRID_MAIN, GRID_SUB);
-      g.material.transparent = true;
-      g.material.opacity = opacity;
-      g.material.depthWrite = false;
-      if (position) g.position.copy(position);
-      if (rotation) g.rotation.copy(rotation);
-      return g;
+    // ---- THE VOID: multi-axis architectural grids (monochrome) ----
+    const GRID_MAIN  = new THREE.Color(0x5a5a5a);   // dim base lines (always visible)
+    const GRID_GLOW  = new THREE.Color(0xffffff);   // bright head of the travelling pulse
+
+    // === MASTER SWEEP SPEED — raise = faster pulses, lower = slower. ===
+    // (Each line still gets its own per-line variation on top of this.)
+    const GRID_SWEEP_SPEED = 0.12;
+
+    // One shared clock drives every line's flow; per-line randomness (baked into
+    // the geometry) makes each stroke light up at its own phase / speed / direction.
+    const gridFlow = {
+      uTime:   { value: 0 },
+      uSpeed:  { value: GRID_SWEEP_SPEED },
+      uCellZ:  { value: 500 },   // depth cell size — set at build (keeps flow periodic)
+      uCZ:     { value: 0 },     // lattice centre Z (for per-layer phase)
+      uPeriod: { value: 14 },    // sweep phases repeat every N cells (set at build)
+    };
+    const gridMats = [];
+    let gridCellZ   = 500;   // Z spacing of the lattice
+    let gridPeriodZ = 7000;  // wrap distance = uPeriod·cellZ (> fog far → repeat unseen)
+
+    // Build a VOLUMETRIC 3D lattice that fills the whole box and is periodic in Z
+    // (so the camera can wrap by one cell for seamless infinite flight). Lines:
+    //   • Z-rails  (aType=1): run down the depth at every (x,y) node — flowing light
+    //     dashes (periodic in Z) → the main "flying forward" motion cue.
+    //   • XY frames (aType=0): a full grid at every depth layer → horizontal rungs
+    //     AND vertical lines everywhere. They get comet sweeps too, but with a
+    //     CROSS-SECTION seed (identical on every layer) so the wrap stays seamless.
+    // Per-vertex: aRnd (random seeds), aType (rail/frame), aFlow (0..1 along line).
+    function buildLattice(W, H, D, divX, divY, divZ, cz) {
+      const hx = W / 2, hy = H / 2, hz = D / 2;
+      const sx = W / divX, sy = H / divY, sz = D / divZ;
+      const pos = [], rnd = [], type = [], flow = [];
+      const seed3 = () => [Math.random(), Math.random(), Math.random()];
+      // fixed per-cross-section seeds → reused on every depth layer (keeps it seamless)
+      const vertSeed = Array.from({ length: divX + 1 }, seed3);
+      const rungSeed = Array.from({ length: divY + 1 }, seed3);
+      const pushLine = (ax, ay, az, bx, by, bz, t, s) => {
+        pos.push(ax, ay, az, bx, by, bz);
+        type.push(t, t);
+        flow.push(0, 1);                            // 0 at start → 1 at end
+        rnd.push(s[0], s[1], s[2], s[0], s[1], s[2]); // constant per line
+      };
+      // Z-rails at every (x,y) node — span the full depth (continuous → seamless)
+      for (let i = 0; i <= divX; i++) {
+        for (let j = 0; j <= divY; j++) {
+          pushLine(-hx + sx * i, -hy + sy * j, -hz + cz,
+                   -hx + sx * i, -hy + sy * j,  hz + cz, 1.0, seed3());
+        }
+      }
+      // Full XY grid at every depth layer (rungs + verticals throughout the space)
+      for (let k = 0; k <= divZ; k++) {
+        const z = -hz + sz * k + cz;
+        for (let j = 0; j <= divY; j++)             // X rungs (horizontal)
+          pushLine(-hx, -hy + sy * j, z,  hx, -hy + sy * j, z, 0.0, rungSeed[j]);
+        for (let i = 0; i <= divX; i++)             // Y verticals
+          pushLine(-hx + sx * i, -hy, z,  -hx + sx * i, hy, z, 0.0, vertSeed[i]);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,  3));
+      geo.setAttribute('aType',    new THREE.Float32BufferAttribute(type, 1));
+      geo.setAttribute('aFlow',    new THREE.Float32BufferAttribute(flow, 1));
+      geo.setAttribute('aRnd',     new THREE.Float32BufferAttribute(rnd,  3));
+      return geo;
     }
-    // Floor + ceiling (default GridHelper lies on XZ plane)
-    scene.add(gridLayer(10000, 100, 0.30, new THREE.Vector3(0, -500, -1500)));
-    scene.add(gridLayer(10000, 100, 0.18, new THREE.Vector3(0,  500, -1500)));
-    // Back wall (rotate XZ grid → XY plane facing camera)
-    scene.add(gridLayer(10000,  60, 0.22,
-      new THREE.Vector3(0, 0, -4500),
-      new THREE.Euler(Math.PI / 2, 0, 0)));
 
-    // ---- GIANT WIREFRAME TYPOGRAPHY (loaded async) ----
-    const textGroup = new THREE.Group();
-    scene.add(textGroup);
+    const GRID_VERT = `
+      #include <common>
+      #include <fog_pars_vertex>
+      attribute float aType;
+      attribute float aFlow;
+      attribute vec3  aRnd;
+      varying vec3  vWorld;
+      varying float vType;
+      varying float vFlow;
+      varying vec3  vRnd;
+      void main() {
+        vType = aType;
+        vFlow = aFlow;
+        vRnd  = aRnd;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorld = worldPosition.xyz;
+        vec4 mvPosition = viewMatrix * worldPosition;
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }
+    `;
+    const GRID_FRAG = `
+      #include <common>
+      #include <fog_pars_fragment>
+      uniform float uOpacity;    // base for the static frame lines
+      uniform float uRailBase;   // base for the Z-rails
+      uniform float uTime;
+      uniform float uSpeed;      // dash flow speed (cells / sec)
+      uniform float uCellZ;      // depth cell size → makes the flow periodic
+      uniform float uCZ;         // lattice centre Z
+      uniform float uPeriod;     // phases repeat every N cells (seamless wrap period)
+      uniform vec3  uColor;
+      uniform vec3  uGlow;
+      varying vec3  vWorld;
+      varying float vType;
+      varying float vFlow;
+      varying vec3  vRnd;
 
-    const WORDS = [
-      { text: 'AI',        size: 240, pos: [-460, 220, -900 ], color: 0xffffff, rot: [0,  0.18, 0] },
-      { text: 'NEURAL',    size: 160, pos: [ 540,-130, -1500], color: 0x1a56ff, rot: [0, -0.22, 0] },
-      { text: 'MIND',      size: 380, pos: [   0,  20, -3000], color: 0x1a56ff, rot: [0,  0.00, 0] },
-      { text: 'DEEP',      size: 200, pos: [-680,-380, -1900], color: 0xffffff, rot: [0,  0.28, 0] },
-      { text: 'PROCESS',   size: 130, pos: [-800, 380, -2100], color: 0x1a56ff, rot: [0,  0.32, 0] },
-      { text: 'THINK',     size: 170, pos: [ 760,-340, -2400], color: 0xffffff, rot: [0, -0.42, 0] },
-      { text: 'LEARN',     size: 220, pos: [ 380, 460, -2800], color: 0xffffff, rot: [0, -0.18, 0] },
-      { text: 'COGNITION', size: 140, pos: [-1100, 60, -3700], color: 0x1a56ff, rot: [0,  0.45, 0] },
+      void main() {
+        bool  isRail = vType > 0.5;
+        float base   = isRail ? uRailBase : uOpacity;
+        float pulse  = 0.0;
+        if (isRail) {
+          // Dashes flowing along the rail toward the camera. Driven by WORLD Z +
+          // time, repeating every cell → perfectly periodic, so the camera's
+          // per-cell wrap is invisible. Per-rail phase from aRnd.x.
+          float p  = vWorld.z / uCellZ - uTime * uSpeed + vRnd.x;
+          float f  = fract(p);
+          float dd = min(f, 1.0 - f);                  // 0 at the dash centre
+          float head = exp(-(dd * dd) / 0.0016);
+          float tail = exp(-(dd * dd) / 0.05) * 0.30;
+          pulse = clamp(head + tail, 0.0, 1.0);
+        } else {
+          // Comet sweep running ALONG the frame line. Phase/speed/dir come from
+          // the cross-section seed AND a per-layer random offset that repeats every
+          // uPeriod cells. Because uPeriod·cellZ is bigger than the fog distance,
+          // the repeat is never visible → every line looks independently random,
+          // yet the camera's wrap (by uPeriod cells) stays perfectly seamless.
+          float layer = floor((vWorld.z - uCZ) / uCellZ + 0.5);
+          float lh    = fract(sin(mod(layer, uPeriod) * 91.37 + vRnd.y * 53.17) * 43758.5453);
+          float dir   = fract(vRnd.z + lh) > 0.5 ? 1.0 : -1.0;
+          float speed = (0.5 + fract(vRnd.y + lh) * 1.1) * uSpeed * 1.6;
+          float head  = fract(uTime * speed * dir + vRnd.x + lh);
+          float d     = vFlow - head;
+          d           = d - floor(d + 0.5);            // shortest wrapped distance
+          float headG = exp(-(d * d) / 0.0016);        // tight bright core
+          float tail  = exp(-(d * d) / 0.05) * 0.32;   // soft halo
+          pulse = clamp(headG + tail, 0.0, 1.0);
+        }
+        float a   = clamp(base + pulse * 0.95, 0.0, 1.0);
+        vec3  col = mix(uColor, uGlow, pulse) + uGlow * pulse * 0.55;
+        gl_FragColor = vec4(col, a);
+        #include <fog_fragment>
+      }
+    `;
+
+    function gridMaterial(frameOpacity, railBase) {
+      const mat = new THREE.ShaderMaterial({
+        // fog uniforms live on the material (renderer writes them each frame);
+        // the flow uniforms (uTime/uSpeed/uCellZ) are shared by reference.
+        uniforms: Object.assign(
+          THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+          {
+            uOpacity:  { value: frameOpacity },
+            uRailBase: { value: railBase },
+            uColor:    { value: GRID_MAIN },
+            uGlow:     { value: GRID_GLOW },
+          },
+          gridFlow
+        ),
+        vertexShader: GRID_VERT,
+        fragmentShader: GRID_FRAG,
+        transparent: true,
+        depthWrite: false,
+        fog: true,
+      });
+      gridMats.push(mat);
+      return mat;
+    }
+
+    // ---- INFINITE VOLUMETRIC GRID ----
+    // One big 3D lattice filling the space: Z-rails (animated dashes) + a full XY
+    // grid at every depth layer (verticals & rungs everywhere). Sweep phases repeat
+    // every COR_PERIOD cells, and the camera wraps by that same distance — chosen
+    // larger than the fog range, so the repeat is never seen → seamless + random.
+    const COR_W      = 5200;          // cross-section width
+    const COR_H      = 2800;          // cross-section height
+    const COR_DEPTH  = 26000;         // depth (≫ fog → ends never show, room to wrap)
+    const COR_CELL   = 520;           // cell size (line spacing in all 3 axes)
+    const COR_PERIOD = 14;            // sweep/wrap period in cells (×cell ≈ 7280 > fog)
+    const COR_CZ     = CAM_INSIDE_Z;  // centre the lattice on the dive's landing point
+    const corDivX = Math.round(COR_W / COR_CELL);
+    const corDivY = Math.round(COR_H / COR_CELL);
+    const corDivZ = Math.round(COR_DEPTH / COR_CELL);
+    gridCellZ   = COR_DEPTH / corDivZ;        // exact Z spacing
+    gridPeriodZ = COR_PERIOD * gridCellZ;     // seamless wrap distance
+    gridFlow.uCellZ.value  = gridCellZ;
+    gridFlow.uCZ.value     = COR_CZ;
+    gridFlow.uPeriod.value = COR_PERIOD;
+
+    scene.add(new THREE.LineSegments(
+      buildLattice(COR_W, COR_H, COR_DEPTH, corDivX, corDivY, corDivZ, COR_CZ),
+      gridMaterial(0.16, 0.10)   // (frame-line opacity, rail base opacity)
+    ));
+
+    // ---- FLOATING SCREENS (left & right walls, infinite loop) ----
+    // Images from /3DSpaceScreens are placed on the left/right of the flight path.
+    // They are TILED every gridPeriodZ — the exact distance the camera wraps by —
+    // so they repeat seamlessly forever as you scroll-fly through the void.
+    //
+    // ░░░ HOW TO CONTROL THE SIZE OF THE SCREENS ░░░
+    // Every screen keeps the ORIGINAL pixel dimensions of its source image — so both
+    // the aspect ratio AND the relative size between screens match the files exactly.
+    //   • SCREEN_SCALE   — master size knob: world units PER image pixel. Each screen's
+    //                      size = (its native pixel w×h) × SCREEN_SCALE. Bump it to grow
+    //                      everything together while preserving every image's true ratio.
+    //   • SCREEN_SIDE_X  — how far left/right of the centre the screens sit
+    //                      (bigger = pushed further out toward the walls).
+    //   • SCREEN_TILT    — inward angle (radians); 0 = flat/facing the camera,
+    //                      higher = angled to face the flight path.
+    const SCREEN_SCALE  = 3.0;      // ← master size knob (world units per source-image pixel)
+    const SCREEN_SIDE_X = 1500;     // ← horizontal distance from centre
+    const SCREEN_TILT   = 0.5;      // ← inward angle in radians
+
+    // side: -1 = left, +1 = right · z: position along ONE period (0..1) · y: vertical offset
+    // (No width here — each screen is sized straight from its image's native resolution.)
+    const SCREEN_LAYOUT = [
+      { src: '3DSpaceScreens/Frame 2147240429.png', side: -1, z: 0.08, y:  240 },
+      { src: '3DSpaceScreens/Frame 2147240438.png', side:  1, z: 0.26, y: -140 },
+      { src: '3DSpaceScreens/Frame 2147240439.png', side: -1, z: 0.46, y: -260 },
+      { src: '3DSpaceScreens/Frame 2147240440.png', side:  1, z: 0.66, y:  200 },
+      { src: '3DSpaceScreens/Frame 2147240441.png', side: -1, z: 0.84, y:   40 },
     ];
 
-    const FONT_URL = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json';
-    if (THREE.FontLoader && THREE.TextGeometry) {
-      new THREE.FontLoader().load(FONT_URL, function (font) {
-        WORDS.forEach(w => {
-          const textGeo = new THREE.TextGeometry(w.text, {
-            font: font,
-            size: w.size,
-            height: Math.max(4, w.size * 0.04),
-            curveSegments: 4,
-            bevelEnabled: false,
-          });
-          textGeo.center();
-          const wireGeo = new THREE.WireframeGeometry(textGeo);
-          const mat = new THREE.LineBasicMaterial({
-            color: w.color,
-            transparent: true,
-            opacity: 0.55,
-            depthWrite: false,
-          });
-          const lines = new THREE.LineSegments(wireGeo, mat);
-          lines.position.set(w.pos[0], w.pos[1], w.pos[2]);
-          lines.rotation.set(w.rot[0], w.rot[1], w.rot[2]);
-          textGroup.add(lines);
+    const screenGroup = new THREE.Group();
+    scene.add(screenGroup);
+    const screenTexLoader = new THREE.TextureLoader();
+
+    // Tile the whole layout across several periods around the flight window. The
+    // camera's Z always lives inside ONE period, and the pattern repeats either
+    // side of it (≫ the fog range), so wrapping is invisible → infinite loop.
+    const SCREEN_TILES = [-2, -1, 0, 1, 2];
+    SCREEN_LAYOUT.forEach((cfg) => {
+      const meshes = [];
+      const tex = screenTexLoader.load(cfg.src, (t) => {
+        t.minFilter = THREE.LinearFilter;
+        t.magFilter = THREE.LinearFilter;
+        // Size from the image's native pixels → preserves both aspect ratio and
+        // relative scale between screens, exactly as in the /3DSpaceScreens folder.
+        const w = t.image.width  * SCREEN_SCALE;
+        const h = t.image.height * SCREEN_SCALE;
+        meshes.forEach((m) => { m.scale.set(w, h, 1); m.visible = true; });
+      });
+      SCREEN_TILES.forEach((p) => {
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false,
         });
-      }, undefined, (err) => console.warn('[brain] font load failed', err));
-    }
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+        mesh.position.set(
+          cfg.side * SCREEN_SIDE_X,
+          cfg.y,
+          CAM_INSIDE_Z + (cfg.z + p) * gridPeriodZ
+        );
+        mesh.rotation.y = -cfg.side * SCREEN_TILT;   // angle inward toward the flight path
+        mesh.visible = false;                        // shown once the texture has sized it
+        screenGroup.add(mesh);
+        meshes.push(mesh);
+      });
+    });
+
+    // (Giant wireframe typography removed — the void is now just the grid.)
+    const textGroup = new THREE.Group();
+    scene.add(textGroup);
 
     // ---- SHATTER WALL: snapshot the whole 2D page → grid of textured planes ----
     // Wall sized to fill the camera's view at CAM_HOME_Z so it reads as "the screen".
@@ -914,21 +1235,22 @@
       const x = s.getContext('2d');
       x.fillStyle = '#010103';
       x.fillRect(0, 0, 1440, 750);
+      try { const a = document.getElementById('asciiBgCanvas'); if (a) x.drawImage(a, 0, 0, 1440, 750); } catch (e) {}
       try { x.drawImage(statueCanvas, 411, 16, 618, 670); } catch (e) {}
-      x.textBaseline = 'top';
-      // "The"
-      x.fillStyle = '#aeaeae';
-      x.font = '400 112px "TASA Orbiter Display", system-ui, sans-serif';
-      x.fillText('The', 120, 95);
-      // "Ideal"
-      x.fillStyle = '#ffffff';
-      x.font = 'italic 400 133px "Instrument Serif", serif';
-      x.fillText('Ideal', 200, 198);
-      // "Candidate" (centered)
-      x.font = '400 112px "TASA Orbiter Display", system-ui, sans-serif';
-      x.textAlign = 'center';
-      x.fillText('Candidate', 720, 458);
+      // Title — "the Ideal Candidate", one line centred near the bottom
+      const baseY = 716;
+      const theFont  = 'italic 400 161px "Instrument Serif", serif';
+      const restFont = '300 145px "Inter Tight", system-ui, sans-serif';
+      try { x.letterSpacing = '-7px'; } catch (e) {}
+      x.fillStyle = 'rgba(255,255,255,0.82)';
+      x.textBaseline = 'alphabetic';
       x.textAlign = 'left';
+      x.font = theFont;  const w1 = x.measureText('the ').width;
+      x.font = restFont; const w2 = x.measureText('Ideal Candidate').width;
+      const sx = (1440 - (w1 + w2)) / 2;
+      x.font = theFont;  x.fillText('the ', sx, baseY);
+      x.font = restFont; x.fillText('Ideal Candidate', sx + w1, baseY);
+      try { x.letterSpacing = '0px'; } catch (e) {}
       return s;
     }
     function buildShatterWall() {
@@ -1001,7 +1323,24 @@
     let isAnimating = false;
     let mouseX = 0, mouseY = 0;
     let camX = 0, camY = 0;
+    // Smoothed look-rotation. Eased (like camX/camY) so when the dive hands off
+    // to the idle parallax the view tilts in from level instead of snapping to
+    // the mouse orientation (the jolt seen right after entering the void).
+    let rotX = 0, rotY = 0;
     const shake = { amt: 0 };      // camera-shake magnitude during the dive
+    // Resting framing offset so no grid line sits dead-centre (balanced view).
+    // Eased in during the dive so the camera arrives here smoothly (no late pop).
+    const CAM_OFF_X = 260, CAM_OFF_Y = 120;
+
+    // ---- SCROLL-TO-FLY (momentum glide → camera Z) ----
+    // A wheel flick adds velocity; friction coasts it to a stop, so you clearly
+    // travel several cells forward instead of nudging. The lattice is periodic in
+    // Z, so the rendered Z is wrapped into one cell → endless flight, no seam.
+    const SCROLL_PUSH     = 0.9;    // impulse per wheel-delta unit (sensitivity)
+    const SCROLL_FRICTION = 0.93;   // glide decay (higher = longer coast)
+    const SCROLL_MAXVEL   = 340;    // clamp top speed (units/frame)
+    let scrollZ   = CAM_INSIDE_Z;   // unwrapped scroll position
+    let scrollVel = 0;              // current glide velocity
 
     // ---- OPEN: warp-blur + shatter wall + camera dive ----
     function open() {
@@ -1013,6 +1352,7 @@
       camera.rotation.set(0, 0, 0);
       camera.fov = FOV_HOME; camera.updateProjectionMatrix();
       camX = 0; camY = 0;
+      rotX = 0; rotY = 0;   // start level so the look-rotation eases in (no snap)
       shake.amt = 0;
       setBlur(0);
 
@@ -1032,6 +1372,7 @@
           setBlur(0);
           shake.amt = 0;
           camera.fov = FOV_HOME; camera.updateProjectionMatrix();
+          scrollZ = camera.position.z; scrollVel = 0;  // hand Z control to scroll
           isAnimating = false;
           isOpen = true;
         }
@@ -1039,6 +1380,9 @@
 
       // Camera plunge forward (-z) through the wall into the void
       tl.to(camera.position, { z: CAM_INSIDE_Z, duration: DUR, ease: 'power4.inOut' }, 0);
+      // Ease into the resting framing offset during the dive → no pop at the end.
+      // (Shake jitter is added on top of this base in the render loop.)
+      tl.to(camera.position, { x: CAM_OFF_X, y: CAM_OFF_Y, duration: DUR, ease: 'power2.inOut' }, 0);
 
       // Fish-eye FOV punch (rush out, then settle back)
       const fov = { v: FOV_HOME };
@@ -1070,73 +1414,35 @@
       });
     }
 
-    // ---- CLOSE: build wall in scattered state in front of camera, reassemble, pull back, fade ----
+    // ---- CLOSE: gentle pull-back + crossfade straight to the real home page ----
+    // No fake reassembled "screen" — we just fade the void overlay out, revealing
+    // the real (correctly-sized) home page sitting underneath it.
     function close() {
       if (!isOpen || isAnimating) return;
       isAnimating = true;
 
-      // Build a fresh wall in front of camera (in -z direction)
-      shatterGroup = buildShatterWall();
-      const FRONT_DIST = 800;
-      shatterGroup.position.set(0, 0, camera.position.z - FRONT_DIST);
-      scene.add(shatterGroup);
-
-      // Initialize fragments at scattered positions (relative to group), opacity 0
-      shatterGroup.children.forEach(frag => {
-        const s = frag.userData.scatter;
-        frag.position.set(s.x, s.y, s.z);
-        frag.rotation.set(s.rx, s.ry, s.rz);
-        frag.material.opacity = 0;
-      });
-
-      const DUR = 1.8;
+      const DUR = 1.0;
       const startZ = camera.position.z;
       const tl = gsap.timeline({
         onComplete: () => {
-          // After reassembly + pullback, fade overlay (via inline opacity override),
-          // then strip the class and clean up.
-          gsap.to(overlay, {
-            opacity: 0,
-            duration: 0.5,
-            ease: 'power2.inOut',
-            onComplete: () => {
-              overlay.classList.remove('inside-brain');
-              overlay.style.opacity = ''; // give CSS back control for next open
-              disposeShatter(shatterGroup);
-              shatterGroup = null;
-              camera.position.set(0, 0, CAM_HOME_Z);
-              camera.rotation.set(0, 0, 0);
-              camera.fov = FOV_HOME; camera.updateProjectionMatrix();
-              camX = 0; camY = 0;
-              setBlur(0); shake.amt = 0;
-              isAnimating = false;
-              isOpen = false;
-            }
-          });
+          overlay.classList.remove('inside-brain');
+          overlay.style.opacity = ''; // give CSS back control for next open
+          camera.position.set(0, 0, CAM_HOME_Z);
+          camera.rotation.set(0, 0, 0);
+          camera.fov = FOV_HOME; camera.updateProjectionMatrix();
+          camX = 0; camY = 0;
+          setBlur(0); shake.amt = 0;
+          isAnimating = false;
+          isOpen = false;
         }
       });
 
-      // Camera pulls back (toward +z), recentering x/y
-      tl.to(camera.position, { x: 0, y: 0, z: startZ + 320, duration: DUR, ease: 'power3.inOut' }, 0);
+      // Subtle drift back + level out so the exit feels intentional, not abrupt
+      tl.to(camera.position, { x: 0, y: 0, z: startZ + 220, duration: DUR, ease: 'power2.inOut' }, 0);
+      tl.to(camera.rotation, { x: 0, y: 0, z: 0, duration: DUR, ease: 'power2.inOut' }, 0);
 
-      // Level the camera rotation
-      tl.to(camera.rotation, { x: 0, y: 0, z: 0, duration: DUR * 0.85, ease: 'power2.inOut' }, 0);
-
-      // A softer blur pulse as the screen re-forms
-      if (blurPass) {
-        tl.fromTo(blurPass.uniforms.uStrength, { value: 0 },
-          { value: 0.8, duration: DUR * 0.4, ease: 'power2.in' }, 0);
-        tl.to(blurPass.uniforms.uStrength,
-          { value: 0, duration: DUR * 0.55, ease: 'power2.out' }, DUR * 0.4);
-      }
-
-      // Reassemble: fragments fly back to origin, rotation back to 0, opacity back to 1
-      shatterGroup.children.forEach(frag => {
-        const o = frag.userData.origin;
-        tl.to(frag.position, { x: o.x, y: o.y, z: o.z, duration: DUR, ease: 'power3.inOut' }, 0);
-        tl.to(frag.rotation, { x: 0, y: 0, z: 0, duration: DUR, ease: 'power3.inOut' }, 0);
-        tl.to(frag.material, { opacity: 1, duration: 0.7, ease: 'power2.out' }, 0.35);
-      });
+      // Soft crossfade: void fades out → real home page shows through underneath
+      tl.to(overlay, { opacity: 0, duration: DUR * 0.85, ease: 'power2.inOut' }, DUR * 0.15);
     }
 
     // ---- MOUSE PARALLAX (active only after the dive completes) ----
@@ -1145,31 +1451,62 @@
       mouseY = (e.clientY / window.innerHeight) * 2 - 1;
     }, { passive: true });
 
+    // ---- SCROLL TO FLY: wheel down = forward (−z), up = back. Momentum + infinite. ----
+    overlay.addEventListener('wheel', (e) => {
+      if (!isOpen || isAnimating) return;
+      e.preventDefault();                       // don't scroll the page behind the void
+      scrollVel -= e.deltaY * SCROLL_PUSH * 0.1; // add impulse (down → forward)
+      scrollVel = Math.max(-SCROLL_MAXVEL, Math.min(SCROLL_MAXVEL, scrollVel));
+    }, { passive: false });
+
     // ---- RENDER LOOP ----
     function loop() {
       requestAnimationFrame(loop);
       if (!isOpen && !isAnimating) return;
 
-      // Camera shake during the dive (GSAP owns z/rotation; shake owns x/y here)
+      // Camera shake during the dive — jitter ADDED on top of GSAP's eased x/y
+      // (which is gliding toward the framing offset), so they don't fight.
       if (isAnimating && shake.amt > 0.01) {
-        camera.position.x = (Math.random() - 0.5) * shake.amt;
-        camera.position.y = (Math.random() - 0.5) * shake.amt;
+        camera.position.x += (Math.random() - 0.5) * shake.amt;
+        camera.position.y += (Math.random() - 0.5) * shake.amt;
       }
 
-      // Parallax only once settled inside the void
+      // Parallax + smooth scroll-fly only once settled inside the void
       if (isOpen && !isAnimating) {
         const tx = mouseX * 140;
         const ty = -mouseY * 80;
         camX += (tx - camX) * 0.045;
         camY += (ty - camY) * 0.045;
-        camera.position.x = camX;
-        camera.position.y = camY;
-        camera.rotation.y = -mouseX * 0.18;
-        camera.rotation.x =  mouseY * 0.10;
+        // resting framing offset (matches where the dive landed → no jump at handoff)
+        camera.position.x = camX + CAM_OFF_X;
+        camera.position.y = camY + CAM_OFF_Y;
+        // momentum glide → coast forward, friction eases to a stop
+        scrollVel *= SCROLL_FRICTION;
+        if (Math.abs(scrollVel) < 0.02) scrollVel = 0;
+        scrollZ += scrollVel;
+        // wrap by the full sweep period so the lattice reads as infinite (no seam);
+        // keeping scrollZ wrapped also keeps it numerically bounded forever.
+        scrollZ = CAM_INSIDE_Z + ((((scrollZ - CAM_INSIDE_Z) % gridPeriodZ) + gridPeriodZ) % gridPeriodZ);
+        camera.position.z = scrollZ;
+        // Ease the look-rotation toward the mouse (starts at 0 = the dive's
+        // level landing) so the handoff is smooth instead of snapping.
+        rotY += (-mouseX * 0.18 - rotY) * 0.045;
+        rotX += ( mouseY * 0.10 - rotX) * 0.045;
+        camera.rotation.y = rotY;
+        camera.rotation.x = rotX;
       }
+
+      // Floating screens only show once settled inside the void (hidden during the dive)
+      screenGroup.visible = isOpen && !isAnimating;
 
       // Subtle typography breathing — sells the "vast space" feel
       textGroup.rotation.y = Math.sin(performance.now() * 0.00018) * 0.04;
+
+      // ---- PER-LINE LIGHT SWEEP ----
+      // Each grid line carries a glowing pulse that runs along it; the per-line
+      // random seeds (baked into the geometry) give every stroke its own phase,
+      // speed and direction, so lights flow across the whole grid continuously.
+      gridFlow.uTime.value = performance.now() * 0.001;
 
       if (composer) composer.render();
       else renderer.render(scene, camera);
@@ -1212,7 +1549,7 @@
     display.width = W; display.height = H;
 
     // Dither params (from dither_brain.html) — mutable so the tuning panel can drive them
-    let RES = 13, NOISE = 47, FPS = 36, THRESH = 1.7, CONTRAST = 2.3, SHADOW_LIFT = 28;
+    let RES = 9, NOISE = 47, FPS = 36, THRESH = 1.7, CONTRAST = 2.3, SHADOW_LIFT = 28;
     let CHARSET = "#*+-. ";
     let TINT = { r: 0xff, g: 0xff, b: 0xff };
     let MODE = 'ascii';                 // 'ascii' = glyphs · 'halftone' = circle/ring dots
@@ -1365,7 +1702,26 @@
         let dx = s.x - centerS.x, dy = s.y - centerS.y;
         const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
         const off = 132;
-        const lx = s.x + dx * off, ly = s.y + dy * off;
+
+        // Desired label endpoint: push the line outward from the brain.
+        let lx = s.x + dx * off, ly = s.y + dy * off;
+
+        // Keep the whole tag on-screen by clamping the endpoint into the
+        // viewport (minus a margin). The text stays anchored to the line end
+        // the same way (left/right by dx, vertically centred); only the LINE
+        // length changes — so it grows/shrinks as the tag drifts to an edge.
+        const M = 14;                            // viewport margin
+        const tw = a.el.offsetWidth  || 0;       // tag box size (stage coords)
+        const th = a.el.offsetHeight || 0;
+        if (dx < 0) {                            // text extends left of endpoint
+          lx = Math.min(lx, W - M);
+          lx = Math.max(lx, M + tw);
+        } else {                                 // text extends right of endpoint
+          lx = Math.max(lx, M);
+          lx = Math.min(lx, W - M - tw);
+        }
+        ly = Math.max(ly, M + th / 2);           // text is vertically centred
+        ly = Math.min(ly, H - M - th / 2);
 
         a.dot.setAttribute('x', s.x - 2.5); a.dot.setAttribute('y', s.y - 2.5);
         a.dot.style.opacity = a.op;
@@ -1508,6 +1864,376 @@
     return { open, close, isOpen: () => isOpen };
   })();
 
+  // === Audio Visualiser — audio-reactive particle wave field (opens on MOUTH) ===
+  // Ported from audio_visualizer.html to the page's global THREE (r128) and the
+  // fixed 1440×750 stage. Lazily initialised on first open; render loop is gated
+  // by isOpen so it costs nothing while closed.
+  const audioViz = (function () {
+    if (typeof THREE === 'undefined') {
+      return { open() {}, close() {}, isOpen: () => false };
+    }
+
+    const overlay  = document.getElementById('audioViz-overlay');
+    const canvas   = document.getElementById('audioVizCanvas');
+    const closeBtn = overlay.querySelector('.btn-close-brain');
+
+    const W = 1440, H = 750;
+
+    let renderer, scene, camera, points, uniforms, audioTex;
+    let clock, started = false, isOpen = false, raf = 0;
+
+    // Camera framing
+    const camTarget = new THREE.Vector3(0, -2, -55);
+    const camBase   = new THREE.Vector3(0, 24, 176);
+
+    // Grid
+    const GRID_X = 300, GRID_Z = 340;
+    const SPAN_X = 320, SPAN_Z = 340;
+    const COUNT  = GRID_X * GRID_Z;
+
+    // Audio frequency texture data
+    const FREQ_BINS  = 256;
+    const freqData   = new Uint8Array(FREQ_BINS);
+    const freqSmooth = new Float32Array(FREQ_BINS);
+
+    // Audio nodes / state
+    const audioEl = document.getElementById('av-audio');
+    let audioCtx, analyser, srcNode, gainNode, audioReady = false;
+    let levelSmooth = 0, bassSmooth = 0;
+
+    // UI refs
+    const drop      = document.getElementById('av-drop');
+    const fileInput = document.getElementById('av-file');
+    const playBtn   = document.getElementById('av-play');
+    const iconPlay  = document.getElementById('av-icon-play');
+    const iconPause = document.getElementById('av-icon-pause');
+    const trackEl   = document.getElementById('av-track');
+    const seek      = document.getElementById('av-seek');
+    const curEl     = document.getElementById('av-cur');
+    const durEl     = document.getElementById('av-dur');
+    const volEl     = document.getElementById('av-vol');
+
+    const vertexShader = `
+      uniform float uTime;
+      uniform sampler2D uAudioTex;
+      uniform float uLevel;
+      uniform float uBass;
+      uniform float uSpanZ;
+      uniform float uSpanX;
+      uniform float uFocus;
+      uniform float uAperture;
+      uniform float uSize;
+      uniform float uPixelRatio;
+
+      attribute vec2 aGrid;
+      attribute float aRand;
+
+      varying float vBright;
+      varying float vAlpha;
+
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+      float noise(vec2 p){
+        vec2 i = floor(p); vec2 f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i+vec2(0,0)), hash(i+vec2(1,0)), u.x),
+                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+      }
+
+      void main() {
+        vec3 p = position;
+        float t = uTime;
+
+        float zN = clamp((position.z + uSpanZ * 0.5) / uSpanZ, 0.0, 1.0);
+        float frontFlat = smoothstep(1.0, 0.78, zN);
+        float midBand = smoothstep(0.30, 0.48, zN) * smoothstep(0.80, 0.60, zN);
+        float centerX = smoothstep(0.40, 0.12, abs(position.x) / uSpanX);
+        midBand *= centerX;
+
+        float h = 0.0;
+        h += sin(p.x * 0.045 + t * 0.45) * cos(p.z * 0.05 - t * 0.30) * 3.4;
+        h += sin(p.x * 0.11  - t * 0.25) * 1.7;
+        h += cos(p.z * 0.09  + t * 0.40) * 1.9;
+        h += noise(p.xz * 0.06 + vec2(t * 0.06, -t * 0.04)) * 5.5;
+        h += noise(p.xz * 0.22) * 1.1;
+
+        h *= frontFlat;
+
+        float radial = length(vec2(p.x / uSpanX, (p.z) / uSpanZ));
+        float fi = fract(radial * 1.6 + aRand * 0.04);
+        float freq = texture2D(uAudioTex, vec2(fi, 0.5)).r;
+
+        float audioRipple = freq * (8.0 + uLevel * 10.0);
+        audioRipple *= 0.6 + 0.4 * sin(radial * 28.0 - t * 3.0);
+        float audio = (uBass * 5.0 + audioRipple) * midBand;
+
+        h += audio;
+        h *= (1.0 + uLevel * 0.35 * midBand);
+
+        p.y = h;
+
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        float depth = -mv.z;
+
+        float persp = uSize * (230.0 / depth);
+        float coc   = abs(depth - uFocus) * uAperture;
+        float shrink = mix(0.35, 1.0, smoothstep(6.0, 90.0, depth));
+        float sizePx = (persp + coc) * shrink;
+        gl_PointSize = clamp(sizePx * uPixelRatio, 0.0, 8.0 * uPixelRatio);
+
+        float optical = persp + coc;
+        float focusBright = (persp * persp) / (optical * optical);
+
+        float crest = smoothstep(-3.0, 8.0, h);
+
+        vBright = focusBright * (0.30 + 0.60 * crest);
+        vBright += freq * crest * 0.40;
+
+        float far  = smoothstep(360.0, 190.0, depth);
+        float near = smoothstep(2.0, 16.0, depth);
+        vAlpha = clamp(far * near, 0.0, 1.0);
+
+        gl_Position = projectionMatrix * mv;
+      }
+    `;
+
+    const fragmentShader = `
+      precision highp float;
+      varying float vBright;
+      varying float vAlpha;
+      void main() {
+        vec2 c = gl_PointCoord - 0.5;
+        float dist = length(c);
+        float a = 1.0 - smoothstep(0.40, 0.50, dist);
+        float b = vBright;
+        vec3 col = vec3(0.92, 0.94, 0.97) * b;
+        gl_FragColor = vec4(col, a * vAlpha * clamp(b, 0.0, 1.0));
+      }
+    `;
+
+    function buildScene() {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(W, H, false);
+      renderer.setClearColor(0x000000, 1);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 1200);
+      camera.position.copy(camBase);
+      camera.lookAt(camTarget);
+
+      const positions = new Float32Array(COUNT * 3);
+      const aGrid     = new Float32Array(COUNT * 2);
+      const aRand     = new Float32Array(COUNT);
+      let i3 = 0, i2 = 0, i1 = 0;
+      for (let z = 0; z < GRID_Z; z++) {
+        for (let x = 0; x < GRID_X; x++) {
+          const u = x / (GRID_X - 1);
+          const v = z / (GRID_Z - 1);
+          const jx = (Math.random() - 0.5) * (SPAN_X / GRID_X) * 0.9;
+          const jz = (Math.random() - 0.5) * (SPAN_Z / GRID_Z) * 0.9;
+          positions[i3 + 0] = (u - 0.5) * SPAN_X + jx;
+          positions[i3 + 1] = 0;
+          positions[i3 + 2] = (v - 0.5) * SPAN_Z + jz;
+          aGrid[i2 + 0] = u; aGrid[i2 + 1] = v;
+          aRand[i1] = Math.random();
+          i3 += 3; i2 += 2; i1 += 1;
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('aGrid', new THREE.BufferAttribute(aGrid, 2));
+      geo.setAttribute('aRand', new THREE.BufferAttribute(aRand, 1));
+
+      audioTex = new THREE.DataTexture(freqData, FREQ_BINS, 1, THREE.RedFormat, THREE.UnsignedByteType);
+      audioTex.magFilter = THREE.LinearFilter;
+      audioTex.minFilter = THREE.LinearFilter;
+      audioTex.needsUpdate = true;
+
+      uniforms = {
+        uTime:       { value: 0 },
+        uAudioTex:   { value: audioTex },
+        uLevel:      { value: 0 },
+        uBass:       { value: 0 },
+        uSpanZ:      { value: SPAN_Z },
+        uSpanX:      { value: SPAN_X },
+        uFocus:      { value: 95 },
+        uAperture:   { value: 0.015 },
+        uSize:       { value: 1.2 },
+        uPixelRatio: { value: renderer.getPixelRatio() },
+      };
+
+      const material = new THREE.ShaderMaterial({
+        uniforms, vertexShader, fragmentShader,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      points = new THREE.Points(geo, material);
+      scene.add(points);
+
+      clock = new THREE.Clock();
+    }
+
+    function initAudio() {
+      if (audioReady) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      srcNode = audioCtx.createMediaElementSource(audioEl);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.20;
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = parseFloat(volEl.value) / 100;
+      srcNode.connect(analyser);
+      analyser.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      audioReady = true;
+    }
+
+    function sampleAudio() {
+      if (!audioReady || audioEl.paused) {
+        for (let i = 0; i < FREQ_BINS; i++) freqSmooth[i] += (0 - freqSmooth[i]) * 0.05;
+        levelSmooth += (0 - levelSmooth) * 0.04;
+        bassSmooth  += (0 - bassSmooth)  * 0.04;
+      } else {
+        analyser.getByteFrequencyData(freqData);
+        let sum = 0, bass = 0;
+        for (let i = 0; i < FREQ_BINS; i++) {
+          const v = freqData[i] / 255;
+          freqSmooth[i] += (v - freqSmooth[i]) * 0.22;
+          sum += freqSmooth[i];
+          if (i < 24) bass += freqSmooth[i];
+        }
+        levelSmooth += (sum / FREQ_BINS - levelSmooth) * 0.78;
+        bassSmooth  += (bass / 24 - bassSmooth) * 0.92;
+      }
+      for (let i = 0; i < FREQ_BINS; i++) freqData[i] = Math.min(255, freqSmooth[i] * 255);
+      audioTex.needsUpdate = true;
+      uniforms.uLevel.value = levelSmooth;
+      uniforms.uBass.value  = bassSmooth;
+    }
+
+    // --- camera interaction (drag to look, scroll to zoom, idle drift) ---
+    let dragging = false, px = 0, py = 0;
+    let yaw = 0, pitch = 0, zoom = 0;
+    let yawT = 0, pitchT = 0, zoomT = 0;
+
+    function wireInteraction() {
+      canvas.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; });
+      window.addEventListener('pointerup', () => { dragging = false; });
+      window.addEventListener('pointermove', e => {
+        if (!isOpen || !dragging) return;
+        yawT   += (e.clientX - px) * 0.0016;
+        pitchT += (e.clientY - py) * 0.0012;
+        pitchT = Math.max(-0.35, Math.min(0.5, pitchT));
+        px = e.clientX; py = e.clientY;
+      });
+      canvas.addEventListener('wheel', e => {
+        if (!isOpen) return;
+        e.preventDefault();
+        zoomT = Math.max(-2, Math.min(60, zoomT + e.deltaY * 0.03));
+      }, { passive: false });
+    }
+
+    function wireUI() {
+      const fmt = (s) => {
+        if (!isFinite(s)) return '0:00';
+        const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+        return m + ':' + String(ss).padStart(2, '0');
+      };
+      const loadFile = (file) => {
+        if (!file) return;
+        audioEl.src = URL.createObjectURL(file);
+        trackEl.textContent = file.name;
+        playBtn.disabled = false;
+        seek.disabled = false;
+        audioEl.load();
+      };
+
+      drop.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+      ['dragenter', 'dragover'].forEach(ev =>
+        drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
+      ['dragleave', 'drop'].forEach(ev =>
+        drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
+      drop.addEventListener('drop', e => {
+        const f = e.dataTransfer.files[0];
+        if (f && f.type.startsWith('audio')) loadFile(f);
+      });
+
+      playBtn.addEventListener('click', async () => {
+        initAudio();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        if (audioEl.paused) audioEl.play(); else audioEl.pause();
+      });
+
+      audioEl.addEventListener('play',  () => { iconPlay.style.display = 'none'; iconPause.style.display = ''; });
+      audioEl.addEventListener('pause', () => { iconPlay.style.display = ''; iconPause.style.display = 'none'; });
+      audioEl.addEventListener('loadedmetadata', () => { durEl.textContent = fmt(audioEl.duration); });
+      audioEl.addEventListener('timeupdate', () => {
+        if (!seek.matches(':active')) seek.value = (audioEl.currentTime / audioEl.duration) * 1000 || 0;
+        curEl.textContent = fmt(audioEl.currentTime);
+      });
+      audioEl.addEventListener('ended', () => { iconPlay.style.display = ''; iconPause.style.display = 'none'; });
+
+      seek.addEventListener('input', () => {
+        if (audioEl.duration) audioEl.currentTime = (seek.value / 1000) * audioEl.duration;
+      });
+      volEl.addEventListener('input', () => {
+        if (gainNode) gainNode.gain.value = volEl.value / 100;
+        audioEl.volume = volEl.value / 100;
+      });
+    }
+
+    function animate() {
+      raf = requestAnimationFrame(animate);
+      if (!isOpen) return;
+
+      const t = clock.getElapsedTime();
+      uniforms.uTime.value = t;
+      sampleAudio();
+
+      yaw   += (yawT - yaw) * 0.06;
+      pitch += (pitchT - pitch) * 0.06;
+      zoom  += (zoomT - zoom) * 0.06;
+
+      const driftX = Math.sin(t * 0.10) * 3.0;
+      const driftY = Math.cos(t * 0.13) * 1.0;
+      camera.position.x = camBase.x + driftX + Math.sin(yaw) * 24;
+      camera.position.y = camBase.y + driftY + pitch * 16;
+      camera.position.z = Math.max(172, camBase.z + zoom);
+      camera.lookAt(camTarget.x + Math.sin(yaw) * 10, camTarget.y + pitch * 6, camTarget.z);
+
+      renderer.render(scene, camera);
+    }
+
+    function open() {
+      if (isOpen) return;
+      if (!started) {
+        buildScene(); wireUI(); wireInteraction(); started = true;
+        // Pre-warm while the overlay is still invisible: compile the GLSL
+        // program and upload the 102k-point buffers to the GPU now, so this
+        // heavy one-time hitch doesn't land in the middle of the fade-in
+        // (the cause of the glitch when entering the mouth section).
+        renderer.compile(scene, camera);
+        renderer.render(scene, camera);
+        raf = requestAnimationFrame(animate);
+      }
+      isOpen = true;
+      // Defer the fade by a frame so the pre-warm work is fully flushed
+      // before the opacity transition begins.
+      requestAnimationFrame(() => overlay.classList.add('inside-audioViz'));
+    }
+    function close() {
+      if (!isOpen) return;
+      isOpen = false;
+      overlay.classList.remove('inside-audioViz');
+      if (!audioEl.paused) audioEl.pause();
+    }
+
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) close(); });
+
+    return { open, close, isOpen: () => isOpen };
+  })();
+
   // === Hover interactions — toggle .active on the matching feature ===
   document.querySelectorAll('.hover-zone').forEach(zone => {
     const feat = document.getElementById('feat-' + zone.dataset.target);
@@ -1515,10 +2241,12 @@
     zone.addEventListener('mouseleave', () => feat.classList.remove('active'));
     zone.addEventListener('click', (e) => {
       e.stopPropagation();
-      // When revealed: EYE dives into the 3D void, HEAD opens the ASCII brain
+      // When revealed: EYE dives into the 3D void, HEAD opens the ASCII brain,
+      // MOUTH opens the audio-reactive particle wave.
       if (feat.classList.contains('active')) {
-        if (zone.dataset.target === 'eye')  { brain.open();      return; }
-        if (zone.dataset.target === 'head') { brainAscii.open(); return; }
+        if (zone.dataset.target === 'eye')   { brain.open();      return; }
+        if (zone.dataset.target === 'head')  { brainAscii.open(); return; }
+        if (zone.dataset.target === 'mouth') { audioViz.open();   return; }
       }
       // Touch toggle for the others
       const wasActive = feat.classList.contains('active');
@@ -1532,6 +2260,310 @@
   if (eyeBox) eyeBox.addEventListener('click', (e) => { e.stopPropagation(); brain.open(); });
   const headBox = document.querySelector('#feat-head .box');
   if (headBox) headBox.addEventListener('click', (e) => { e.stopPropagation(); brainAscii.open(); });
+  const mouthBox = document.querySelector('#feat-mouth .box');
+  if (mouthBox) mouthBox.addEventListener('click', (e) => { e.stopPropagation(); audioViz.open(); });
+</script>
+
+<!-- ===== TEMPORARY ASCII-field tuning panel (remove once defaults are locked) ===== -->
+<style>
+  #af-panel {
+    position: fixed; left: 24px; top: 24px; width: 290px;
+    padding: 16px 18px 18px; z-index: 60;
+    background: rgba(16,16,18,0.72);
+    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.10); border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    user-select: none; transition: opacity .35s ease, transform .35s ease;
+    max-height: calc(100vh - 48px); overflow-y: auto;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #f4f4f6;
+  }
+  #af-panel::-webkit-scrollbar { width: 6px; }
+  #af-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+  #af-panel.collapsed { transform: translateX(calc(-100% - 24px)); opacity: 0; pointer-events: none; }
+  #af-panel h1 { margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .3px; }
+  #af-panel .sub { margin: 0 0 12px; font-size: 11px; color: #8a8a92; }
+  #af-panel .group { margin-top: 13px; }
+  #af-panel .head { display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8a8a92; font-weight: 600; margin-bottom: 7px; }
+  #af-panel .val { color: #f4f4f6; font-variant-numeric: tabular-nums; }
+  #af-panel input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
+    border-radius: 3px; background: rgba(255,255,255,0.18); cursor: pointer; outline: none; }
+  #af-panel input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%; background: #fff; }
+  #af-panel select, #af-panel input[type=color] { width: 100%; padding: 7px 10px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); color: #f4f4f6;
+    border-radius: 8px; outline: none; font-family: inherit; font-size: 12px; cursor: pointer; }
+  #af-panel input[type=color] { height: 34px; padding: 2px 4px; }
+  #af-panel .toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 13px; }
+  #af-panel .toggle-row label { font-size: 12px; color: #8a8a92; cursor: pointer; }
+  #af-panel .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex: none; cursor: pointer; }
+  #af-panel .switch input { display: none; }
+  #af-panel .switch .slot { position: absolute; inset: 0; border-radius: 999px; background: rgba(255,255,255,0.14); transition: background .2s; }
+  #af-panel .switch .knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  #af-panel .switch input:checked + .slot { background: rgba(255,255,255,0.55); }
+  #af-panel .switch input:checked + .slot .knob { transform: translateX(16px); }
+  #af-panel .dump { margin-top: 16px; width: 100%; background: rgba(255,255,255,0.10); color: #fff;
+    border: 1px solid rgba(255,255,255,0.16); padding: 8px; border-radius: 8px; font-size: 11px; cursor: pointer; font-family: inherit; }
+  #af-panel .dump:hover { background: rgba(255,255,255,0.18); }
+  #af-reopen { position: fixed; left: 24px; top: 24px; z-index: 59; width: 40px; height: 40px; border-radius: 12px;
+    background: rgba(16,16,18,0.72); border: 1px solid rgba(255,255,255,0.10);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    display: grid; place-items: center; cursor: pointer; color: #f4f4f6;
+    opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+  #af-reopen.show { opacity: 1; pointer-events: auto; }
+  #af-reopen svg { width: 18px; height: 18px; }
+</style>
+
+<div id="af-reopen" title="Show ASCII controls">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+</div>
+<div id="af-panel">
+  <h1>ASCII Field</h1>
+  <p class="sub">Background glyph cloud — tune, then I'll lock it in</p>
+
+  <div class="group">
+    <div class="head"><span>Character Set</span></div>
+    <select id="af-charset">
+      <option value="dense">Dense (Ñ@#W...)</option>
+      <option value="code">Code soup (&lt;/&gt;{}[]...)</option>
+      <option value="blocks">Block pixels (█▓▒░)</option>
+      <option value="binary">Binary (1 0)</option>
+      <option value="squares">Dot Matrix (■ ▪ ·)</option>
+      <option value="minimal">Minimal (# * + - .)</option>
+    </select>
+  </div>
+
+  <div class="group"><div class="head"><span>Tint</span></div><input type="color" id="af-tint" value="#d1d1d1"></div>
+  <div class="group"><div class="head"><span>Opacity</span><span id="af-opacityVal" class="val"></span></div><input type="range" id="af-opacity" min="0.02" max="0.6" step="0.01"></div>
+  <div class="group"><div class="head"><span>Contrast</span><span id="af-contrastVal" class="val"></span></div><input type="range" id="af-contrast" min="1" max="3" step="0.05"></div>
+  <div class="group"><div class="head"><span>Density (grid px)</span><span id="af-cellVal" class="val"></span></div><input type="range" id="af-cell" min="3" max="20" step="1"></div>
+  <div class="group"><div class="head"><span>Block Size</span><span id="af-gscaleVal" class="val"></span></div><input type="range" id="af-gscale" min="0.2" max="1.2" step="0.05"></div>
+  <div class="group"><div class="head"><span>Shape Scale</span><span id="af-scaleVal" class="val"></span></div><input type="range" id="af-scale" min="0.5" max="1.8" step="0.05"></div>
+  <div class="group"><div class="head"><span>Detail</span><span id="af-detailVal" class="val"></span></div><input type="range" id="af-detail" min="0.8" max="5.0" step="0.1"></div>
+  <div class="group"><div class="head"><span>Edge Wobble</span><span id="af-wobbleVal" class="val"></span></div><input type="range" id="af-wobble" min="0" max="1" step="0.01"></div>
+  <div class="group"><div class="head"><span>Morph Speed</span><span id="af-morphVal" class="val"></span></div><input type="range" id="af-morph" min="0" max="1.5" step="0.05"></div>
+  <div class="group"><div class="head"><span>Drift Speed</span><span id="af-driftVal" class="val"></span></div><input type="range" id="af-drift" min="0" max="6" step="0.1"></div>
+  <div class="group"><div class="head"><span>Flicker</span><span id="af-flickerVal" class="val"></span></div><input type="range" id="af-flicker" min="0" max="1" step="0.01"></div>
+  <div class="group"><div class="head"><span>Frame Rate (fps)</span><span id="af-fpsVal" class="val"></span></div><input type="range" id="af-fps" min="6" max="60" step="1"></div>
+
+  <div class="toggle-row"><label class="switch"><input type="checkbox" id="af-follow"><span class="slot"><span class="knob"></span></span></label><label for="af-follow">Follow cursor</label></div>
+  <div class="group"><div class="head"><span>Follow Lag</span><span id="af-lagVal" class="val"></span></div><input type="range" id="af-lag" min="0.01" max="0.25" step="0.01"></div>
+  <div class="toggle-row"><label class="switch"><input type="checkbox" id="af-invert"><span class="slot"><span class="knob"></span></span></label><label for="af-invert">Invert (glyphs outside shape)</label></div>
+
+  <button class="dump" id="af-dump">Log current values to console</button>
+  <div class="toggle-row" style="margin-top:12px; justify-content:flex-end;"><label id="af-hide" style="cursor:pointer; font-size:12px;">Hide panel ×</label></div>
+</div>
+
+<!-- ===== Ambient ASCII field — organic drifting glyph cloud (homepage background) =====
+     Ported from ascii_background.html. Runs on its OWN canvas behind the statue, so it
+     never interacts with the David head dither. Ambient drift only (no cursor follow),
+     since the cursor drives the statue's hover zones. -->
+<script>
+(function () {
+  const canvas = document.getElementById('asciiBgCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d', { alpha: true });
+
+  const W = 1440, H = 750;                    // stage design size
+  function resize() {
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width  = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Tuned defaults from the ASCII Field studio (cursor-follow ON, like the demo)
+  const CFG = {
+    density: "#*+=-:. ",
+    tint: { r: 209, g: 209, b: 209 },
+    opacity: 0.26, cell: 6, gscale: 0.95, scale: 1.8,
+    detail: 1.9, wobble: 1, morph: 1.5, drift: 1.5,
+    flicker: 0.05, fps: 30, invert: false,
+    follow: true, lag: 0.02,
+    contrast: 1.0          // 1 = neutral (reverted); >1 = punchier
+  };
+
+  // charset presets + hex helper (used by the live control panel below)
+  const charSets = {
+    dense:   "Ñ@#W$9876543210?!abc;:+=-,._ ",
+    code:    "</>{}[]()=+*&^%$#@!?;:~_- ",
+    blocks:  "█▓▒░ ",
+    binary:  "10 ",
+    squares: "■▪·· ",
+    minimal: "#*+=-:. "
+  };
+  function hexToRgb(hex) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 209, g: 209, b: 209 };
+  }
+
+  // Cursor tracking — store raw viewport coords, map into the (scaled, centred)
+  // stage canvas each frame via getBoundingClientRect so follow stays accurate.
+  let ptrX = window.innerWidth / 2, ptrY = window.innerHeight / 2;
+  window.addEventListener('pointermove', e => { ptrX = e.clientX; ptrY = e.clientY; }, { passive: true });
+  let curX = 0, curY = 0;   // eased follow centre (trails the cursor)
+
+  // Head mask — David's silhouette (alpha of david_before.png) is punched out of
+  // the ASCII field so the background glyphs never show through behind the head.
+  // Drawn at the same stage rect the statue canvas occupies.
+  const STATUE_RECT = { x: 411, y: 16, w: 618, h: 670 };
+  const maskImg = new Image();
+  let maskReady = false;
+  maskImg.onload = () => { maskReady = true; };
+  maskImg.src = 'david_before.png';
+
+  /* ---- Live control panel (temporary tuning UI — wired to CFG) ---- */
+  (function controls() {
+    const $ = id => document.getElementById(id);
+    const panel = $('af-panel'), reopen = $('af-reopen');
+    if (!panel) return;
+
+    const bindRange = (id, key, isInt, lbl) => {
+      const el = $(id); if (!el) return;
+      el.value = CFG[key];
+      if (lbl) $(lbl).textContent = CFG[key];
+      el.addEventListener('input', () => {
+        CFG[key] = isInt ? parseInt(el.value, 10) : parseFloat(el.value);
+        if (lbl) $(lbl).textContent = el.value;
+      });
+    };
+    bindRange('af-opacity',  'opacity',  false, 'af-opacityVal');
+    bindRange('af-contrast', 'contrast', false, 'af-contrastVal');
+    bindRange('af-cell',     'cell',     true,  'af-cellVal');
+    bindRange('af-gscale',   'gscale',   false, 'af-gscaleVal');
+    bindRange('af-scale',    'scale',    false, 'af-scaleVal');
+    bindRange('af-detail',   'detail',   false, 'af-detailVal');
+    bindRange('af-wobble',   'wobble',   false, 'af-wobbleVal');
+    bindRange('af-morph',    'morph',    false, 'af-morphVal');
+    bindRange('af-drift',    'drift',    false, 'af-driftVal');
+    bindRange('af-flicker',  'flicker',  false, 'af-flickerVal');
+    bindRange('af-fps',      'fps',      true,  'af-fpsVal');
+    bindRange('af-lag',      'lag',      false, 'af-lagVal');
+
+    const cs = $('af-charset');
+    for (const k in charSets) if (charSets[k] === CFG.density) { cs.value = k; break; }
+    cs.addEventListener('change', () => { CFG.density = charSets[cs.value]; });
+
+    const tint = $('af-tint');
+    tint.addEventListener('input', () => { CFG.tint = hexToRgb(tint.value); });
+
+    const follow = $('af-follow'); follow.checked = CFG.follow;
+    follow.addEventListener('change', () => { CFG.follow = follow.checked; });
+    const invert = $('af-invert'); invert.checked = CFG.invert;
+    invert.addEventListener('change', () => { CFG.invert = invert.checked; });
+
+    $('af-hide').addEventListener('click', () => { panel.classList.add('collapsed'); reopen.classList.add('show'); });
+    reopen.addEventListener('click', () => { panel.classList.remove('collapsed'); reopen.classList.remove('show'); });
+
+    $('af-dump').addEventListener('click', () => {
+      const out = {
+        density: CFG.density, tintHex: tint.value, opacity: CFG.opacity, contrast: CFG.contrast,
+        cell: CFG.cell, gscale: CFG.gscale, scale: CFG.scale, detail: CFG.detail, wobble: CFG.wobble,
+        morph: CFG.morph, drift: CFG.drift, flicker: CFG.flicker, fps: CFG.fps,
+        follow: CFG.follow, lag: CFG.lag, invert: CFG.invert
+      };
+      console.log('[ASCII BG] current values:\n' + JSON.stringify(out, null, 2));
+    });
+  })();
+
+  // value noise + fbm
+  function hash(x, y) { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); }
+  function smooth(t) { return t * t * (3 - 2 * t); }
+  function noise2(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy, ux = smooth(fx), uy = smooth(fy);
+    const a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+    return a * (1 - ux) * (1 - uy) + b * ux * (1 - uy) + c * (1 - ux) * uy + d * ux * uy;
+  }
+  function fbm(x, y, oct) {
+    let v = 0, amp = 0.5, freq = 1, norm = 0;
+    for (let i = 0; i < oct; i++) { v += amp * noise2(x * freq, y * freq); norm += amp; amp *= 0.5; freq *= 2; }
+    return v / norm;
+  }
+  function smoothstepf(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+
+  function shapeField(nx, ny, t, scale, detail, wobble, cx, cy) {
+    const aspect = W / H;
+    const sx = (nx - 0.5) * aspect, sy = (ny - 0.5);
+    const mx = sx - cx, my = sy - cy;
+    const ang = Math.atan2(my, mx);
+    let r = Math.hypot(mx, my) / (0.34 * scale);
+    r += (Math.sin(ang * 3 + t * 0.6) * 0.10 + Math.sin(ang * 5 - t * 0.4) * 0.06 + Math.sin(ang * 2 + t * 0.25) * 0.12) * wobble;
+    r += (fbm(mx * 1.6 * detail + t * 0.15, my * 1.6 * detail - t * 0.12, 4) - 0.5) * 0.9 * wobble;
+    const mask = 1 - smoothstepf(0.55, 1.15, r);
+    const tex = fbm(sx * 3.2 * detail - t * 0.2, sy * 3.2 * detail + t * 0.18, 5);
+    return Math.max(0, Math.min(1, mask * (0.35 + 0.85 * tex)));
+  }
+
+  let lastDraw = 0;
+  const t0 = performance.now();
+  function draw(now) {
+    requestAnimationFrame(draw);
+    if (now - lastDraw < 1000 / CFG.fps) return;
+    lastDraw = now;
+
+    const elapsed = (now - t0) / 1000;
+    const t  = elapsed * CFG.morph;
+    const dt = elapsed * CFG.drift;
+    const aspect = W / H;
+
+    // organic wander (always running)
+    const wanderX = (Math.sin(dt * 0.047) * 0.75 + Math.sin(dt * 0.019) * 0.25) * 0.70;
+    const wanderY = (Math.cos(dt * 0.039) * 0.74 + Math.sin(dt * 0.026) * 0.26) * 0.44;
+
+    // anchor = cursor (mapped into the scaled/centred stage) when follow is on,
+    // else screen centre. eased so the blob trails the pointer with a delay.
+    let anchorX = 0, anchorY = 0, wanderScale = 1.0;
+    if (CFG.follow) {
+      const rect = canvas.getBoundingClientRect();
+      anchorX = ((ptrX - rect.left) / rect.width  - 0.5) * aspect;
+      anchorY = ((ptrY - rect.top)  / rect.height - 0.5);
+      wanderScale = 0.45;
+    }
+    const k = 1 - Math.pow(1 - CFG.lag, 60 / CFG.fps);
+    curX += (anchorX - curX) * k;
+    curY += (anchorY - curY) * k;
+    const cx = curX + wanderX * wanderScale;
+    const cy = curY + wanderY * wanderScale;
+
+    const { cell, opacity, scale, detail, wobble, flicker, invert, density, tint, gscale, contrast } = CFG;
+
+    ctx.clearRect(0, 0, W, H);                 // transparent → black stage shows through
+    ctx.font = `${cell * gscale}px "SF Mono","Menlo",Consolas,monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const cols = Math.ceil(W / cell), rows = Math.ceil(H / cell);
+    for (let gy = 0; gy < rows; gy++) {
+      const py = gy * cell + cell * 0.5, ny = py / H;
+      for (let gx = 0; gx < cols; gx++) {
+        const px = gx * cell + cell * 0.5, nx = px / W;
+        let v = shapeField(nx, ny, t, scale, detail, wobble, cx, cy);
+        if (invert) v = 1 - v;
+        if (flicker > 0) v += (Math.random() - 0.5) * flicker * 0.6;
+        // contrast: push values away from mid-grey toward black/white
+        v = (v - 0.5) * contrast + 0.5;
+        v = Math.max(0, Math.min(1, v));
+        if (v < 0.06) continue;
+        const ch = density[Math.floor((1 - v) * (density.length - 1))];
+        if (ch === ' ') continue;
+        ctx.fillStyle = `rgba(${tint.r},${tint.g},${tint.b},${(opacity * v * v).toFixed(3)})`;
+        ctx.fillText(ch, px, py);
+      }
+    }
+
+    // Punch David's head out of the field → no glyphs show behind the statue.
+    if (maskReady) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.drawImage(maskImg, STATUE_RECT.x, STATUE_RECT.y, STATUE_RECT.w, STATUE_RECT.h);
+      ctx.restore();
+    }
+  }
+  requestAnimationFrame(draw);
+})();
 </script>
 </body>
 </html>
