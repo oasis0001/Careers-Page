@@ -71,10 +71,10 @@
   /* Statue (animated ASCII dither canvas) */
   .statue {
     position: absolute;
-    left: 411px;
-    top: 16px;
-    width: 618px;
-    height: 670px;
+    left: 329px;
+    top: -10px;
+    width: 782px;
+    height: 838px;
     pointer-events: none;
     display: block;
   }
@@ -104,114 +104,82 @@
     margin-right: 28px;
   }
 
-  /* Feature reveal */
+  /* Feature label groups — always visible.
+     Default: grey + slightly scaled-down. Hover (.hot): white + full scale.
+     The WHOLE group (box + dots + markers + leader line + text) scales from the
+     CENTRE OF ITS BOX (per-feature transform-origin set below). */
   .feature {
     position: absolute;
     inset: 0;
     pointer-events: none;
     z-index: 5;
+    --c: #7c7c82;                       /* grey resting colour */
+    transform: scale(0.94);             /* slightly smaller at rest */
+    transition: transform 380ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    will-change: transform;
   }
+  .feature.hot {
+    transform: scale(1);                /* grow to full size on hover */
+    --c: #ffffff;                       /* and turn white */
+    z-index: 6;
+  }
+  /* anchor each group's scale to the centre of its own box */
+  #feat-head  { transform-origin: 732.72px 144.06px; }
+  #feat-eye   { transform-origin: 711.82px 308.39px; }
+  #feat-mouth { transform-origin: 653.26px 447.24px; }
+
   .feature .box {
     position: absolute;
-    border: 1px solid #ffffff;
-    background: rgba(217, 217, 217, 0.10);
-    opacity: 0;
-    transform: scale(0.86);
-    transform-origin: center;
-    transition: opacity 260ms cubic-bezier(0.2, 0.7, 0.2, 1),
-                transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
-    box-shadow: 0 0 18px rgba(255,255,255,0.05) inset;
+    border: 1px solid var(--c);
+    background: rgba(217, 217, 217, 0.05);
+    transition: border-color 320ms ease, background 320ms ease;
   }
+  .feature.hot .box { background: rgba(217, 217, 217, 0.12); }
   .feature .dot {
     position: absolute;
-    width: 6px;
-    height: 6px;
-    background: #ffffff;
-    opacity: 0;
-    transition: opacity 200ms ease-out;
+    width: 7.18px;
+    height: 7.18px;
+    background: var(--c);
+    transition: background 320ms ease;
   }
   .feature .marker {
     position: absolute;
     font-family: 'JetBrains Mono', monospace;
-    color: rgba(255,255,255,0.85);
+    color: var(--c);
     font-size: 7.5px;
     font-weight: 400;
-    letter-spacing: 0.4px;
-    opacity: 0;
-    transition: opacity 200ms ease-out;
-    pointer-events: none;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    transform: translateY(-50%);
+    transition: color 320ms ease;
   }
   .feature .line {
     position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     overflow: visible;
     pointer-events: none;
   }
-  .feature .line path {
+  .feature .line polyline {
     fill: none;
-    stroke: #ffffff;
+    stroke: var(--c);
     stroke-width: 1;
-    stroke-linecap: round;
-    stroke-dasharray: var(--len);
-    stroke-dashoffset: var(--len);
-    transition: stroke-dashoffset 620ms cubic-bezier(0.65, 0, 0.35, 1);
-  }
-  .feature .endpoint {
-    position: absolute;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: #ffffff;
-    opacity: 0;
-    transition: opacity 180ms ease-out;
-    transform: translate(-50%, -50%);
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+    transition: stroke 320ms ease;
   }
   .feature .text {
     position: absolute;
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 400;
-    font-size: 17px;
-    color: var(--text);
-    letter-spacing: -0.34px;
-    line-height: 1;
+    font-size: 24px;
+    color: var(--c);
+    letter-spacing: -0.48px;
+    line-height: 1.05;
     text-transform: uppercase;
-    opacity: 0;
-    white-space: nowrap;
-    transition: opacity 260ms ease-out, transform 260ms ease-out;
+    transition: color 320ms ease;
   }
-
-  /* Active state cascading transitions */
-  .feature.active .box {
-    opacity: 1;
-    transform: scale(1);
-    pointer-events: auto;
-    cursor: pointer;
-  }
-  .feature.active .dot {
-    opacity: 1;
-    transition-delay: 80ms;
-  }
-  .feature.active .marker {
-    opacity: 0.9;
-    transition-delay: 120ms;
-  }
-  .feature.active .line path {
-    stroke-dashoffset: 0;
-    transition-delay: 240ms;
-  }
-  .feature.active .endpoint {
-    opacity: 1;
-    transition-delay: 820ms;
-  }
-  .feature.active .text {
-    opacity: 1;
-    transform: translate(0,0);
-    transition-delay: 720ms;
-  }
-
-  /* Pre-active text offsets for slide-in */
-  #feat-head .text { transform: translateX(-6px); }
-  #feat-eye  .text { transform: translate(-6px, -4px); }
-  #feat-mouth .text { transform: translateX(6px); }
 
   /* Hover zones */
   .hover-zone {
@@ -545,73 +513,73 @@
 
     <div class="title-main"><span class="t-the">the</span>Ideal Candidate</div>
 
-    <!-- ====== Feature: HEAD / Forehead ====== -->
+    <!-- ====== Feature: HEAD / Forehead → "Makes AI their thinking partner" ====== -->
     <div class="feature" id="feat-head">
-      <div class="box" style="left:604.2px; top:95.44px; width:254.34px; height:69.1px;"></div>
+      <div class="box" style="left:583.32px; top:104.4px; width:298.81px; height:79.31px;"></div>
 
-      <div class="dot" style="left:601.14px; top:92.39px;"></div>
-      <div class="dot" style="left:855.48px; top:92.39px;"></div>
-      <div class="dot" style="left:601.14px; top:161.49px;"></div>
-      <div class="dot" style="left:855.48px; top:161.49px;"></div>
+      <div class="dot" style="left:579.73px; top:98.94px;"></div>
+      <div class="dot" style="left:878.55px; top:98.94px;"></div>
+      <div class="dot" style="left:579.73px; top:180.13px;"></div>
+      <div class="dot" style="left:878.55px; top:180.13px;"></div>
 
-      <div class="marker" style="left:594px; top:80px;">x100</div>
-      <div class="marker" style="left:848px; top:80px;">x100</div>
-      <div class="marker" style="left:594px; top:170px;">x100</div>
-      <div class="marker" style="left:848px; top:170px;">x100</div>
+      <div class="marker" style="left:575.2px;  top:89.26px;">x100</div>
+      <div class="marker" style="left:870.89px; top:89.26px;">x100</div>
+      <div class="marker" style="left:575.2px;  top:196.98px;">x100</div>
+      <div class="marker" style="left:870.89px; top:196.98px;">x100</div>
 
-      <svg class="line" style="left:858.54px; top:139.69px; width:259.824px; height:11px;" viewBox="0 0 259.824 10.88" preserveAspectRatio="none">
-        <path d="M0.02 0.27 L117.91 10.61 L259.82 10.61" style="--len: 260.2;" />
+      <svg class="line" viewBox="0 0 1440 750" preserveAspectRatio="none">
+        <polyline points="882.16,154.52 1020.65,166.68 1295.06,166.68" />
       </svg>
 
-      <div class="text" style="left:980px; top:132px;">Makes AI their thinking partner.</div>
+      <div class="text" style="left:1089px; top:180px; width:206px;">Makes AI their thinking partner</div>
     </div>
 
-    <!-- ====== Feature: EYE / Face ====== -->
+    <!-- ====== Feature: EYE → "Decodes the world through an AI lens" ====== -->
     <div class="feature" id="feat-eye">
-      <div class="box" style="left:674.09px; top:234.97px; width:78.93px; height:70.43px;"></div>
+      <div class="box" style="left:665.45px; top:267.59px; width:92.73px; height:81.61px;"></div>
 
-      <div class="dot" style="left:671.97px; top:233.11px;"></div>
-      <div class="dot" style="left:748.51px; top:232.85px;"></div>
-      <div class="dot" style="left:672.23px; top:300.88px;"></div>
-      <div class="dot" style="left:748.51px; top:301.15px;"></div>
+      <div class="dot" style="left:662.95px; top:264.27px;"></div>
+      <div class="dot" style="left:752.87px; top:263.96px;"></div>
+      <div class="dot" style="left:663.26px; top:343.89px;"></div>
+      <div class="dot" style="left:752.87px; top:344.2px;"></div>
 
-      <div class="marker" style="left:665px; top:220px;">x100</div>
-      <div class="marker" style="left:745px; top:220px;">x100</div>
-      <div class="marker" style="left:663px; top:310px;">x100</div>
-      <div class="marker" style="left:745px; top:310px;">x100</div>
+      <div class="marker" style="left:657.95px; top:258.5px;">x100</div>
+      <div class="marker" style="left:750.99px; top:258.5px;">x100</div>
+      <div class="marker" style="left:656.39px; top:359.34px;">x100</div>
+      <div class="marker" style="left:750.99px; top:359.34px;">x100</div>
 
-      <svg class="line" style="left:752.63px; top:268.86px; width:381.11px; height:73px;" viewBox="0 0 381.11 72.99" preserveAspectRatio="none">
-        <path d="M0.12 0.24 L142.06 72.72 L381.11 72.72" style="--len: 398.4;" />
+      <svg class="line" viewBox="0 0 1440 750" preserveAspectRatio="none">
+        <polyline points="757.85,306.27 924.61,391.43 1275.8,391.43" />
       </svg>
 
-      <div class="text" style="left:935px; top:324px;">Decodes the world through an AI lens</div>
+      <div class="text" style="left:1041px; top:403px; width:235px;">Decodes the world through an AI lens</div>
     </div>
 
-    <!-- ====== Feature: MOUTH ====== -->
+    <!-- ====== Feature: MOUTH → "Translates objectives into perfect prompts" ====== -->
     <div class="feature" id="feat-mouth">
-      <div class="box" style="left:615.62px; top:369.45px; width:96.21px; height:40.13px;"></div>
+      <div class="box" style="left:596.75px; top:424.45px; width:113.03px; height:45.59px;"></div>
 
-      <div class="dot" style="left:612.44px; top:366.26px;"></div>
-      <div class="dot" style="left:707.58px; top:366.26px;"></div>
-      <div class="dot" style="left:612.44px; top:406.39px;"></div>
-      <div class="dot" style="left:708.38px; top:406.39px;"></div>
+      <div class="dot" style="left:593px;    top:420.7px;"></div>
+      <div class="dot" style="left:704.78px; top:420.7px;"></div>
+      <div class="dot" style="left:593px;    top:467.84px;"></div>
+      <div class="dot" style="left:705.72px; top:467.84px;"></div>
 
-      <div class="marker" style="left:602px; top:354px;">x100</div>
-      <div class="marker" style="left:699px; top:354px;">x100</div>
-      <div class="marker" style="left:602px; top:414px;">x100</div>
-      <div class="marker" style="left:699px; top:414px;">x100</div>
+      <div class="marker" style="left:584.26px; top:413.99px;">x100</div>
+      <div class="marker" style="left:698.54px; top:414.61px;">x100</div>
+      <div class="marker" style="left:584.26px; top:481.74px;">x100</div>
+      <div class="marker" style="left:698.54px; top:481.74px;">x100</div>
 
-      <svg class="line" style="left:222px; top:388px; width:397px; height:4px;" viewBox="0 0 397 4" preserveAspectRatio="none">
-        <path d="M397 2 L0 2" style="--len: 397;" />
+      <svg class="line" viewBox="0 0 1440 750" preserveAspectRatio="none">
+        <polyline points="123.27,350.38 508.48,350.38 600.5,454.25" />
       </svg>
 
-      <div class="text" style="left:222px; top:372px;">Translates objectives into perfect prompts</div>
+      <div class="text" style="left:123px; top:288px; width:309px;">Translates objectives into perfect prompts</div>
     </div>
 
-    <!-- Hover trigger zones (transparent) -->
-    <div class="hover-zone" data-target="head"  style="left:600px; top:90px;  width:262px; height:80px;"></div>
-    <div class="hover-zone" data-target="eye"   style="left:668px; top:228px; width:90px;  height:82px;"></div>
-    <div class="hover-zone" data-target="mouth" style="left:610px; top:363px; width:104px; height:50px;"></div>
+    <!-- Hover trigger zones (transparent, sit over each box) -->
+    <div class="hover-zone" data-target="head"  style="left:580px; top:100px; width:305px; height:88px;"></div>
+    <div class="hover-zone" data-target="eye"   style="left:662px; top:263px; width:99px;  height:90px;"></div>
+    <div class="hover-zone" data-target="mouth" style="left:593px; top:420px; width:120px; height:54px;"></div>
 
 
     <!-- ===== 3D "Inside the Brain" overlay (shatter-dive void) — EYE ===== -->
@@ -777,10 +745,11 @@
     if (!canvas) return;
 
     // 2x oversample so characters stay crisp when the stage scales up
-    // (CSS display size is 618×670; internal pixel buffer is 2× that).
+    // (CSS display size is 782×838 — matches the Figma ascii-art bounds — and
+    // the internal pixel buffer is 2× that.)
     const OVERSAMPLE = 2;
-    const W = 618 * OVERSAMPLE;
-    const H = 670 * OVERSAMPLE;
+    const W = 782 * OVERSAMPLE;
+    const H = 838 * OVERSAMPLE;
     canvas.width = W;
     canvas.height = H;
 
@@ -807,7 +776,7 @@
     let lastDraw = 0;
 
     img.onload = () => {
-      // Source aspect (1205×1306) matches canvas aspect (618×670), no cropping needed
+      // Stretch the source to fill the 782×838 canvas (≈ same aspect as the source)
       offCtx.drawImage(img, 0, 0, W, H);
       ready = true;
     };
@@ -892,13 +861,16 @@
     const FOV_DIVE = 92;          // fish-eye punch at the peak of the dive
 
     // ---- Renderer / Scene / Camera ----
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    // alpha:true so pass-through dives (mouth/head) can render the shattering
+    // page over a TRANSPARENT canvas → the target 3D scene shows through behind.
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.setSize(W, H, false);
     renderer.setClearColor(0x010103, 1);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x010103);
+    const VOID_BG = new THREE.Color(0x010103);   // opaque void backdrop (eye dive)
+    scene.background = VOID_BG;
     scene.fog = new THREE.Fog(0x010103, 1400, 5200);
 
     const camera = new THREE.PerspectiveCamera(FOV_HOME, W / H, 0.1, 10000);
@@ -938,8 +910,9 @@
             float r = texture2D(tDiffuse, base + fromCenter * ca).r;
             float g = texture2D(tDiffuse, base).g;
             float b = texture2D(tDiffuse, base - fromCenter * ca).b;
+            float a = texture2D(tDiffuse, base).a;   // keep source alpha so transparent dives composite over the scene behind
             float w = 1.0 - t * 0.55;             // weight nearer samples a touch more
-            col += vec4(r, g, b, 1.0) * w;
+            col += vec4(r, g, b, a) * w;
             total += w;
           }
           gl_FragColor = col / total;
@@ -1145,10 +1118,13 @@
     gridFlow.uCZ.value     = COR_CZ;
     gridFlow.uPeriod.value = COR_PERIOD;
 
-    scene.add(new THREE.LineSegments(
+    // Captured so we can hide it during pass-through dives (mouth / head),
+    // which must dive straight into their own scene without showing the void.
+    const gridMesh = new THREE.LineSegments(
       buildLattice(COR_W, COR_H, COR_DEPTH, corDivX, corDivY, corDivZ, COR_CZ),
       gridMaterial(0.16, 0.10)   // (frame-line opacity, rail base opacity)
-    ));
+    );
+    scene.add(gridMesh);
 
     // ---- FLOATING SCREENS (left & right walls, infinite loop) ----
     // Images from /3DSpaceScreens are placed on the left/right of the flight path.
@@ -1165,17 +1141,17 @@
     //                      (bigger = pushed further out toward the walls).
     //   • SCREEN_TILT    — inward angle (radians); 0 = flat/facing the camera,
     //                      higher = angled to face the flight path.
-    const SCREEN_SCALE  = 3.0;      // ← master size knob (world units per source-image pixel)
-    const SCREEN_SIDE_X = 1500;     // ← horizontal distance from centre
+    const SCREEN_SCALE  = 0.65;     // ← master size knob (world units per source-image pixel)
+    const SCREEN_SIDE_X = 1050;     // ← horizontal distance from centre
     const SCREEN_TILT   = 0.5;      // ← inward angle in radians
 
     // side: -1 = left, +1 = right · z: position along ONE period (0..1) · y: vertical offset
-    // (No width here — each screen is sized straight from its image's native resolution.)
+    // scale (optional): per-screen size multiplier on top of SCREEN_SCALE (default 1)
     const SCREEN_LAYOUT = [
       { src: '3DSpaceScreens/Frame 2147240429.png', side: -1, z: 0.08, y:  240 },
       { src: '3DSpaceScreens/Frame 2147240438.png', side:  1, z: 0.26, y: -140 },
       { src: '3DSpaceScreens/Frame 2147240439.png', side: -1, z: 0.46, y: -260 },
-      { src: '3DSpaceScreens/Frame 2147240440.png', side:  1, z: 0.66, y:  200 },
+      { src: '3DSpaceScreens/Frame 2147240442.png', side:  1, z: 0.66, y:  200, scale: 0.6 },
       { src: '3DSpaceScreens/Frame 2147240441.png', side: -1, z: 0.84, y:   40 },
     ];
 
@@ -1193,9 +1169,11 @@
         t.minFilter = THREE.LinearFilter;
         t.magFilter = THREE.LinearFilter;
         // Size from the image's native pixels → preserves both aspect ratio and
-        // relative scale between screens, exactly as in the /3DSpaceScreens folder.
-        const w = t.image.width  * SCREEN_SCALE;
-        const h = t.image.height * SCREEN_SCALE;
+        // relative scale between screens. `cfg.scale` (optional) shrinks/grows just
+        // this one screen on top of the master SCREEN_SCALE.
+        const s = SCREEN_SCALE * (cfg.scale || 1);
+        const w = t.image.width  * s;
+        const h = t.image.height * s;
         meshes.forEach((m) => { m.scale.set(w, h, 1); m.visible = true; });
       });
       SCREEN_TILES.forEach((p) => {
@@ -1343,9 +1321,28 @@
     let scrollVel = 0;              // current glide velocity
 
     // ---- OPEN: warp-blur + shatter wall + camera dive ----
-    function open() {
+    function open(dest) {
       if (isOpen || isAnimating) return;
       isAnimating = true;
+
+      // `dest` (optional): a pass-through dive that LANDS in another section's
+      // scene (mouth / head) instead of resting in the void. We play the exact
+      // same shatter + warp-blur + dive on top, reveal the target scene
+      // underneath, then crossfade to it. Eye calls open() with no dest.
+      const transitioning = !!dest;
+      // Eye dives into the void (opaque, grid shown). Mouth/head dive straight
+      // into their OWN 3D scene: hide the void grid AND make this dive's canvas
+      // transparent so the target scene (brain / audio wave) shows THROUGH the
+      // breaking page for the whole dive — only the shattering fragments ride on top.
+      gridMesh.visible = !transitioning;
+      scene.background = transitioning ? null : VOID_BG;
+      renderer.setClearColor(0x010103, transitioning ? 0 : 1);
+      if (transitioning) {
+        overlay.style.background = 'transparent';  // let the target scene behind show through
+        overlay.style.zIndex = '40';      // ride above the target overlay
+        closeBtn.style.display = 'none';  // hide [ESCAPE_MIND] — target shows its own
+        dest.reveal();                    // start the target scene underneath, visible behind
+      }
 
       // Reset camera/post to home state
       camera.position.set(0, 0, CAM_HOME_Z);
@@ -1372,9 +1369,27 @@
           setBlur(0);
           shake.amt = 0;
           camera.fov = FOV_HOME; camera.updateProjectionMatrix();
-          scrollZ = camera.position.z; scrollVel = 0;  // hand Z control to scroll
-          isAnimating = false;
-          isOpen = true;
+          if (transitioning) {
+            // Handed off to the target scene — fully reset the dive overlay so
+            // it's clean (and stops rendering) for next time.
+            camera.position.set(0, 0, CAM_HOME_Z);
+            camera.rotation.set(0, 0, 0);
+            camX = 0; camY = 0; rotX = 0; rotY = 0;
+            overlay.classList.remove('inside-brain');
+            overlay.style.opacity = '';
+            overlay.style.zIndex = '';
+            overlay.style.background = '';
+            closeBtn.style.display = '';
+            gridMesh.visible = true;             // restore for the eye's next void dive
+            scene.background = VOID_BG;          // opaque void backdrop again
+            renderer.setClearColor(0x010103, 1);
+            isAnimating = false;
+            isOpen = false;
+          } else {
+            scrollZ = camera.position.z; scrollVel = 0;  // hand Z control to scroll
+            isAnimating = false;
+            isOpen = true;
+          }
         }
       });
 
@@ -1412,6 +1427,10 @@
         tl.to(frag.rotation, { x: s.rx, y: s.ry, z: s.rz, duration: DUR, ease: 'power3.inOut' }, 0);
         tl.to(frag.material, { opacity: 0, duration: 0.7, ease: 'power2.in' }, DUR * 0.5);
       });
+
+      // No crossfade in pass-through mode: the target scene is already visible
+      // behind the transparent dive, so as the fragments fly past and fade we
+      // simply "land" in it. Cleanup (onComplete) removes the spent dive overlay.
     }
 
     // ---- CLOSE: gentle pull-back + crossfade straight to the real home page ----
@@ -1588,6 +1607,9 @@
     let renderer, scene, camera, pivot, model, threeCanvas, offscreen, offCtx;
     let baseDistance = 3, R = 1, loaded = false, started = false;
     let isOpen = false, raf = 0, lastDraw = 0, lastT = performance.now();
+    // Entry fly-in: camera starts pulled back (zoom > 1) and eases to 1 (rest),
+    // so entering the section feels like flying in toward the brain.
+    const introCam = { zoom: 1 };
 
     const anchors = []; // { dir, dot, line, el, op, hidden, accent }
 
@@ -1783,7 +1805,7 @@
       if (loaded) {
         if (model) model.rotation.set(TILT.x, TILT.y, TILT.z);
         pivot.rotation.y += ROT_Y * dt;
-        camera.position.z = baseDistance * ZOOM;
+        camera.position.z = baseDistance * ZOOM * introCam.zoom;
         camera.lookAt(0, 0, 0);
         renderer.render(scene, camera);
       }
@@ -1791,11 +1813,22 @@
       updateLabels();
     }
 
-    function open() {
-      if (isOpen) return;
+    function preload() {
+      // Load the model + start the (idle) render loop ahead of time so the
+      // fly-in is visible the instant the section is entered.
       if (!started) { initThree(); started = true; raf = requestAnimationFrame(frame); }
+    }
+    function open(fly) {
+      if (isOpen) return;
+      preload();
       isOpen = true;
       overlay.classList.add('inside-brainAscii');
+      if (fly) {
+        // Rush the camera in from far away to its resting distance — same
+        // duration + ease as the eye scene's dive, so they feel identical.
+        introCam.zoom = 3.4;
+        gsap.to(introCam, { zoom: 1, duration: 2.6, ease: 'power4.inOut' });
+      }
     }
     function close() {
       if (!isOpen) return;
@@ -1861,7 +1894,7 @@
       });
     })();
 
-    return { open, close, isOpen: () => isOpen };
+    return { open, close, preload, isOpen: () => isOpen };
   })();
 
   // === Audio Visualiser — audio-reactive particle wave field (opens on MOUTH) ===
@@ -2114,6 +2147,9 @@
     let dragging = false, px = 0, py = 0;
     let yaw = 0, pitch = 0, zoom = 0;
     let yawT = 0, pitchT = 0, zoomT = 0;
+    // Entry fly-in: extra camera distance that eases to 0 (rest), so entering
+    // the section feels like flying in toward the wave.
+    const introCam = { z: 0 };
 
     function wireInteraction() {
       canvas.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; });
@@ -2198,13 +2234,13 @@
       const driftY = Math.cos(t * 0.13) * 1.0;
       camera.position.x = camBase.x + driftX + Math.sin(yaw) * 24;
       camera.position.y = camBase.y + driftY + pitch * 16;
-      camera.position.z = Math.max(172, camBase.z + zoom);
+      camera.position.z = Math.max(172, camBase.z + zoom + introCam.z);
       camera.lookAt(camTarget.x + Math.sin(yaw) * 10, camTarget.y + pitch * 6, camTarget.z);
 
       renderer.render(scene, camera);
     }
 
-    function open() {
+    function open(fly) {
       if (isOpen) return;
       if (!started) {
         buildScene(); wireUI(); wireInteraction(); started = true;
@@ -2217,6 +2253,12 @@
         raf = requestAnimationFrame(animate);
       }
       isOpen = true;
+      if (fly) {
+        // Rush the camera in from far away to its resting distance — same
+        // duration + ease as the eye scene's dive, so they feel identical.
+        introCam.z = 720;
+        gsap.to(introCam, { z: 0, duration: 2.6, ease: 'power4.inOut' });
+      }
       // Defer the fade by a frame so the pre-warm work is fully flushed
       // before the opacity transition begins.
       requestAnimationFrame(() => overlay.classList.add('inside-audioViz'));
@@ -2234,24 +2276,20 @@
     return { open, close, isOpen: () => isOpen };
   })();
 
-  // === Hover interactions — toggle .active on the matching feature ===
+  // === Hover interactions ===
+  // The label groups are ALWAYS on screen (grey, slightly shrunk). Hovering a box
+  // lights its whole group white and scales it to full size (.hot). Clicking dives in.
   document.querySelectorAll('.hover-zone').forEach(zone => {
     const feat = document.getElementById('feat-' + zone.dataset.target);
-    zone.addEventListener('mouseenter', () => feat.classList.add('active'));
-    zone.addEventListener('mouseleave', () => feat.classList.remove('active'));
+    zone.addEventListener('mouseenter', () => feat.classList.add('hot'));
+    zone.addEventListener('mouseleave', () => feat.classList.remove('hot'));
     zone.addEventListener('click', (e) => {
       e.stopPropagation();
-      // When revealed: EYE dives into the 3D void, HEAD opens the ASCII brain,
-      // MOUTH opens the audio-reactive particle wave.
-      if (feat.classList.contains('active')) {
-        if (zone.dataset.target === 'eye')   { brain.open();      return; }
-        if (zone.dataset.target === 'head')  { brainAscii.open(); return; }
-        if (zone.dataset.target === 'mouth') { audioViz.open();   return; }
-      }
-      // Touch toggle for the others
-      const wasActive = feat.classList.contains('active');
-      document.querySelectorAll('.feature').forEach(f => f.classList.remove('active'));
-      if (!wasActive) feat.classList.add('active');
+      // All three use the SAME shatter+dive entrance; EYE lands in the void,
+      // HEAD lands in the ASCII brain, MOUTH lands in the audio particle wave.
+      if (zone.dataset.target === 'eye')   { brain.open();                                       return; }
+      if (zone.dataset.target === 'head')  { brain.open({ reveal: () => brainAscii.open(true) }); return; }
+      if (zone.dataset.target === 'mouth') { brain.open({ reveal: () => audioViz.open(true) });   return; }
     });
   });
 
@@ -2259,100 +2297,15 @@
   const eyeBox = document.querySelector('#feat-eye .box');
   if (eyeBox) eyeBox.addEventListener('click', (e) => { e.stopPropagation(); brain.open(); });
   const headBox = document.querySelector('#feat-head .box');
-  if (headBox) headBox.addEventListener('click', (e) => { e.stopPropagation(); brainAscii.open(); });
+  if (headBox) headBox.addEventListener('click', (e) => { e.stopPropagation(); brain.open({ reveal: () => brainAscii.open(true) }); });
   const mouthBox = document.querySelector('#feat-mouth .box');
-  if (mouthBox) mouthBox.addEventListener('click', (e) => { e.stopPropagation(); audioViz.open(); });
+  if (mouthBox) mouthBox.addEventListener('click', (e) => { e.stopPropagation(); brain.open({ reveal: () => audioViz.open(true) }); });
+
+  // Warm up the brain model in the background so its fly-in is ready on entry.
+  const preloadBrain = () => { try { brainAscii.preload(); } catch (e) {} };
+  if ('requestIdleCallback' in window) requestIdleCallback(preloadBrain, { timeout: 2500 });
+  else setTimeout(preloadBrain, 1200);
 </script>
-
-<!-- ===== TEMPORARY ASCII-field tuning panel (remove once defaults are locked) ===== -->
-<style>
-  #af-panel {
-    position: fixed; left: 24px; top: 24px; width: 290px;
-    padding: 16px 18px 18px; z-index: 60;
-    background: rgba(16,16,18,0.72);
-    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
-    border: 1px solid rgba(255,255,255,0.10); border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-    user-select: none; transition: opacity .35s ease, transform .35s ease;
-    max-height: calc(100vh - 48px); overflow-y: auto;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #f4f4f6;
-  }
-  #af-panel::-webkit-scrollbar { width: 6px; }
-  #af-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
-  #af-panel.collapsed { transform: translateX(calc(-100% - 24px)); opacity: 0; pointer-events: none; }
-  #af-panel h1 { margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .3px; }
-  #af-panel .sub { margin: 0 0 12px; font-size: 11px; color: #8a8a92; }
-  #af-panel .group { margin-top: 13px; }
-  #af-panel .head { display: flex; justify-content: space-between; align-items: center;
-    font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8a8a92; font-weight: 600; margin-bottom: 7px; }
-  #af-panel .val { color: #f4f4f6; font-variant-numeric: tabular-nums; }
-  #af-panel input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
-    border-radius: 3px; background: rgba(255,255,255,0.18); cursor: pointer; outline: none; }
-  #af-panel input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
-    width: 12px; height: 12px; border-radius: 50%; background: #fff; }
-  #af-panel select, #af-panel input[type=color] { width: 100%; padding: 7px 10px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); color: #f4f4f6;
-    border-radius: 8px; outline: none; font-family: inherit; font-size: 12px; cursor: pointer; }
-  #af-panel input[type=color] { height: 34px; padding: 2px 4px; }
-  #af-panel .toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 13px; }
-  #af-panel .toggle-row label { font-size: 12px; color: #8a8a92; cursor: pointer; }
-  #af-panel .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex: none; cursor: pointer; }
-  #af-panel .switch input { display: none; }
-  #af-panel .switch .slot { position: absolute; inset: 0; border-radius: 999px; background: rgba(255,255,255,0.14); transition: background .2s; }
-  #af-panel .switch .knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
-  #af-panel .switch input:checked + .slot { background: rgba(255,255,255,0.55); }
-  #af-panel .switch input:checked + .slot .knob { transform: translateX(16px); }
-  #af-panel .dump { margin-top: 16px; width: 100%; background: rgba(255,255,255,0.10); color: #fff;
-    border: 1px solid rgba(255,255,255,0.16); padding: 8px; border-radius: 8px; font-size: 11px; cursor: pointer; font-family: inherit; }
-  #af-panel .dump:hover { background: rgba(255,255,255,0.18); }
-  #af-reopen { position: fixed; left: 24px; top: 24px; z-index: 59; width: 40px; height: 40px; border-radius: 12px;
-    background: rgba(16,16,18,0.72); border: 1px solid rgba(255,255,255,0.10);
-    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-    display: grid; place-items: center; cursor: pointer; color: #f4f4f6;
-    opacity: 0; pointer-events: none; transition: opacity .35s ease; }
-  #af-reopen.show { opacity: 1; pointer-events: auto; }
-  #af-reopen svg { width: 18px; height: 18px; }
-</style>
-
-<div id="af-reopen" title="Show ASCII controls">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-</div>
-<div id="af-panel">
-  <h1>ASCII Field</h1>
-  <p class="sub">Background glyph cloud — tune, then I'll lock it in</p>
-
-  <div class="group">
-    <div class="head"><span>Character Set</span></div>
-    <select id="af-charset">
-      <option value="dense">Dense (Ñ@#W...)</option>
-      <option value="code">Code soup (&lt;/&gt;{}[]...)</option>
-      <option value="blocks">Block pixels (█▓▒░)</option>
-      <option value="binary">Binary (1 0)</option>
-      <option value="squares">Dot Matrix (■ ▪ ·)</option>
-      <option value="minimal">Minimal (# * + - .)</option>
-    </select>
-  </div>
-
-  <div class="group"><div class="head"><span>Tint</span></div><input type="color" id="af-tint" value="#d1d1d1"></div>
-  <div class="group"><div class="head"><span>Opacity</span><span id="af-opacityVal" class="val"></span></div><input type="range" id="af-opacity" min="0.02" max="0.6" step="0.01"></div>
-  <div class="group"><div class="head"><span>Contrast</span><span id="af-contrastVal" class="val"></span></div><input type="range" id="af-contrast" min="1" max="3" step="0.05"></div>
-  <div class="group"><div class="head"><span>Density (grid px)</span><span id="af-cellVal" class="val"></span></div><input type="range" id="af-cell" min="3" max="20" step="1"></div>
-  <div class="group"><div class="head"><span>Block Size</span><span id="af-gscaleVal" class="val"></span></div><input type="range" id="af-gscale" min="0.2" max="1.2" step="0.05"></div>
-  <div class="group"><div class="head"><span>Shape Scale</span><span id="af-scaleVal" class="val"></span></div><input type="range" id="af-scale" min="0.5" max="1.8" step="0.05"></div>
-  <div class="group"><div class="head"><span>Detail</span><span id="af-detailVal" class="val"></span></div><input type="range" id="af-detail" min="0.8" max="5.0" step="0.1"></div>
-  <div class="group"><div class="head"><span>Edge Wobble</span><span id="af-wobbleVal" class="val"></span></div><input type="range" id="af-wobble" min="0" max="1" step="0.01"></div>
-  <div class="group"><div class="head"><span>Morph Speed</span><span id="af-morphVal" class="val"></span></div><input type="range" id="af-morph" min="0" max="1.5" step="0.05"></div>
-  <div class="group"><div class="head"><span>Drift Speed</span><span id="af-driftVal" class="val"></span></div><input type="range" id="af-drift" min="0" max="6" step="0.1"></div>
-  <div class="group"><div class="head"><span>Flicker</span><span id="af-flickerVal" class="val"></span></div><input type="range" id="af-flicker" min="0" max="1" step="0.01"></div>
-  <div class="group"><div class="head"><span>Frame Rate (fps)</span><span id="af-fpsVal" class="val"></span></div><input type="range" id="af-fps" min="6" max="60" step="1"></div>
-
-  <div class="toggle-row"><label class="switch"><input type="checkbox" id="af-follow"><span class="slot"><span class="knob"></span></span></label><label for="af-follow">Follow cursor</label></div>
-  <div class="group"><div class="head"><span>Follow Lag</span><span id="af-lagVal" class="val"></span></div><input type="range" id="af-lag" min="0.01" max="0.25" step="0.01"></div>
-  <div class="toggle-row"><label class="switch"><input type="checkbox" id="af-invert"><span class="slot"><span class="knob"></span></span></label><label for="af-invert">Invert (glyphs outside shape)</label></div>
-
-  <button class="dump" id="af-dump">Log current values to console</button>
-  <div class="toggle-row" style="margin-top:12px; justify-content:flex-end;"><label id="af-hide" style="cursor:pointer; font-size:12px;">Hide panel ×</label></div>
-</div>
 
 <!-- ===== Ambient ASCII field — organic drifting glyph cloud (homepage background) =====
      Ported from ascii_background.html. Runs on its OWN canvas behind the statue, so it
@@ -2374,30 +2327,16 @@
   resize();
   window.addEventListener('resize', resize);
 
-  // Tuned defaults from the ASCII Field studio (cursor-follow ON, like the demo)
+  // Locked-in defaults (tuned via the studio panel)
   const CFG = {
-    density: "#*+=-:. ",
+    density: "■▪·· ",        // Dot Matrix
     tint: { r: 209, g: 209, b: 209 },
-    opacity: 0.26, cell: 6, gscale: 0.95, scale: 1.8,
+    opacity: 0.51, cell: 6, gscale: 0.45, scale: 1.8,
     detail: 1.9, wobble: 1, morph: 1.5, drift: 1.5,
-    flicker: 0.05, fps: 30, invert: false,
+    flicker: 0.21, fps: 30, invert: false,
     follow: true, lag: 0.02,
-    contrast: 1.0          // 1 = neutral (reverted); >1 = punchier
+    contrast: 1.0
   };
-
-  // charset presets + hex helper (used by the live control panel below)
-  const charSets = {
-    dense:   "Ñ@#W$9876543210?!abc;:+=-,._ ",
-    code:    "</>{}[]()=+*&^%$#@!?;:~_- ",
-    blocks:  "█▓▒░ ",
-    binary:  "10 ",
-    squares: "■▪·· ",
-    minimal: "#*+=-:. "
-  };
-  function hexToRgb(hex) {
-    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 209, g: 209, b: 209 };
-  }
 
   // Cursor tracking — store raw viewport coords, map into the (scaled, centred)
   // stage canvas each frame via getBoundingClientRect so follow stays accurate.
@@ -2408,65 +2347,11 @@
   // Head mask — David's silhouette (alpha of david_before.png) is punched out of
   // the ASCII field so the background glyphs never show through behind the head.
   // Drawn at the same stage rect the statue canvas occupies.
-  const STATUE_RECT = { x: 411, y: 16, w: 618, h: 670 };
+  const STATUE_RECT = { x: 329, y: -10, w: 782, h: 838 };
   const maskImg = new Image();
   let maskReady = false;
   maskImg.onload = () => { maskReady = true; };
   maskImg.src = 'david_before.png';
-
-  /* ---- Live control panel (temporary tuning UI — wired to CFG) ---- */
-  (function controls() {
-    const $ = id => document.getElementById(id);
-    const panel = $('af-panel'), reopen = $('af-reopen');
-    if (!panel) return;
-
-    const bindRange = (id, key, isInt, lbl) => {
-      const el = $(id); if (!el) return;
-      el.value = CFG[key];
-      if (lbl) $(lbl).textContent = CFG[key];
-      el.addEventListener('input', () => {
-        CFG[key] = isInt ? parseInt(el.value, 10) : parseFloat(el.value);
-        if (lbl) $(lbl).textContent = el.value;
-      });
-    };
-    bindRange('af-opacity',  'opacity',  false, 'af-opacityVal');
-    bindRange('af-contrast', 'contrast', false, 'af-contrastVal');
-    bindRange('af-cell',     'cell',     true,  'af-cellVal');
-    bindRange('af-gscale',   'gscale',   false, 'af-gscaleVal');
-    bindRange('af-scale',    'scale',    false, 'af-scaleVal');
-    bindRange('af-detail',   'detail',   false, 'af-detailVal');
-    bindRange('af-wobble',   'wobble',   false, 'af-wobbleVal');
-    bindRange('af-morph',    'morph',    false, 'af-morphVal');
-    bindRange('af-drift',    'drift',    false, 'af-driftVal');
-    bindRange('af-flicker',  'flicker',  false, 'af-flickerVal');
-    bindRange('af-fps',      'fps',      true,  'af-fpsVal');
-    bindRange('af-lag',      'lag',      false, 'af-lagVal');
-
-    const cs = $('af-charset');
-    for (const k in charSets) if (charSets[k] === CFG.density) { cs.value = k; break; }
-    cs.addEventListener('change', () => { CFG.density = charSets[cs.value]; });
-
-    const tint = $('af-tint');
-    tint.addEventListener('input', () => { CFG.tint = hexToRgb(tint.value); });
-
-    const follow = $('af-follow'); follow.checked = CFG.follow;
-    follow.addEventListener('change', () => { CFG.follow = follow.checked; });
-    const invert = $('af-invert'); invert.checked = CFG.invert;
-    invert.addEventListener('change', () => { CFG.invert = invert.checked; });
-
-    $('af-hide').addEventListener('click', () => { panel.classList.add('collapsed'); reopen.classList.add('show'); });
-    reopen.addEventListener('click', () => { panel.classList.remove('collapsed'); reopen.classList.remove('show'); });
-
-    $('af-dump').addEventListener('click', () => {
-      const out = {
-        density: CFG.density, tintHex: tint.value, opacity: CFG.opacity, contrast: CFG.contrast,
-        cell: CFG.cell, gscale: CFG.gscale, scale: CFG.scale, detail: CFG.detail, wobble: CFG.wobble,
-        morph: CFG.morph, drift: CFG.drift, flicker: CFG.flicker, fps: CFG.fps,
-        follow: CFG.follow, lag: CFG.lag, invert: CFG.invert
-      };
-      console.log('[ASCII BG] current values:\n' + JSON.stringify(out, null, 2));
-    });
-  })();
 
   // value noise + fbm
   function hash(x, y) { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); }
