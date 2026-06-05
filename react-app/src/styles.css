@@ -1,0 +1,487 @@
+@font-face {
+  font-family: 'TASA Orbiter Display';
+  src: url('/fonts/TASAOrbiterDisplay-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #010103;
+  --text: #ffffff;
+  --text-muted: #aeaeae;
+}
+html, body, #root {
+  background: var(--bg);
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.scale-wrap {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.stage {
+  position: relative;
+  width: 1440px;
+  height: 750px;
+  flex: none;               /* keep the 1440×750 design size — only transform:scale() resizes it */
+  transform-origin: center center;
+  background: var(--bg);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Animated ASCII field background (organic drifting glyph cloud) */
+.bg-ascii {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+.bg-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 30%, rgba(1,1,3,0.7) 90%),
+    linear-gradient(180deg, transparent 60%, var(--bg) 100%);
+  pointer-events: none;
+}
+
+/* Statue (animated ASCII dither canvas) */
+.statue {
+  position: absolute;
+  left: 329px;
+  top: -10px;
+  width: 782px;
+  height: 838px;
+  pointer-events: none;
+  display: block;
+}
+
+/* Title — "the Ideal Candidate" (single line, anchored to the bottom) */
+.title-main {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-weight: 300;
+  color: var(--text);
+  opacity: 0.82;
+  font-size: 145px;
+  line-height: 0.9;
+  letter-spacing: -7.2px;
+  z-index: 3;
+}
+.title-main .t-the {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 161px;
+  letter-spacing: -3px;
+  margin-right: 28px;
+}
+
+/* Feature label groups — always visible.
+   Default: grey + slightly scaled-down. Hover (.hot): white + full scale.
+   The WHOLE group (box + dots + markers + leader line + text) scales from the
+   CENTRE OF ITS BOX (per-feature transform-origin set below). */
+.feature {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  --c: #7c7c82;                       /* grey resting colour */
+  transform: scale(0.94);             /* slightly smaller at rest */
+  transition: transform 380ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  will-change: transform;
+}
+.feature.hot {
+  transform: scale(1);                /* grow to full size on hover */
+  --c: #ffffff;                       /* and turn white */
+  z-index: 6;
+}
+/* anchor each group's scale to the centre of its own box */
+#feat-head  { transform-origin: 732.72px 144.06px; }
+#feat-eye   { transform-origin: 711.82px 308.39px; }
+#feat-mouth { transform-origin: 653.26px 447.24px; }
+
+.feature .box {
+  position: absolute;
+  border: 1px solid var(--c);
+  background: rgba(217, 217, 217, 0.05);
+  transition: border-color 320ms ease, background 320ms ease;
+}
+.feature.hot .box { background: rgba(217, 217, 217, 0.12); }
+.feature .dot {
+  position: absolute;
+  width: 7.18px;
+  height: 7.18px;
+  background: var(--c);
+  transition: background 320ms ease;
+}
+.feature .marker {
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--c);
+  font-size: 7.5px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  transition: color 320ms ease;
+}
+.feature .line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.feature .line polyline {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 320ms ease;
+}
+.feature .text {
+  position: absolute;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 400;
+  font-size: 24px;
+  color: var(--c);
+  letter-spacing: -0.48px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  transition: color 320ms ease;
+}
+
+/* Hover zones */
+.hover-zone {
+  position: absolute;
+  cursor: crosshair;
+  pointer-events: auto;
+  z-index: 20;
+  background: transparent;
+}
+
+/* Footer hint */
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* === Brain overlay (3D inside-the-mind scene) === */
+#brain-overlay {
+  position: absolute;
+  inset: 0;
+  background: #010103;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+#brain-overlay.inside-brain {
+  opacity: 1;
+  pointer-events: auto;
+}
+#brain3DCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Blurry vignette around the viewport edges while inside the 3D world */
+.brain-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 78% 76% at 50% 50%,
+    transparent 48%,
+    rgba(1, 1, 3, 0.45) 74%,
+    rgba(1, 1, 3, 0.92) 100%);
+}
+.brain-vignette::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  -webkit-mask-image: radial-gradient(ellipse 70% 68% at 50% 50%, transparent 54%, #000 86%);
+          mask-image: radial-gradient(ellipse 70% 68% at 50% 50%, transparent 54%, #000 86%);
+}
+.btn-close-brain {
+  background: rgba(1, 1, 3, 0.4);
+  transition: color 220ms ease, border-color 220ms ease, background 220ms ease;
+  z-index: 2;
+  text-transform: uppercase;
+  user-select: none;
+}
+.btn-close-brain:hover {
+  color: var(--text) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(26, 86, 255, 0.08);
+}
+
+/* === Brain ASCII scene (rotating dithered brain + orbiting AI taglines) === */
+#brainAscii-overlay {
+  position: absolute;
+  inset: 0;
+  background: #010103;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+#brainAscii-overlay.inside-brainAscii {
+  opacity: 1;
+  pointer-events: auto;
+}
+#brainSceneCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* leader lines + brain anchor dots */
+#brainLeaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+#brainLeaders .brain-leader {
+  stroke: #ffffff;
+  stroke-width: 1;
+  opacity: 0;
+}
+#brainLeaders .brain-node { fill: #ffffff; }
+/* floating image cards (DOM, billboarded — always upright/facing camera) */
+#brainLabels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+#brainLabels .brain-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+#brainLabels .brain-tag img {
+  display: block;
+  width: 168px;             /* fallback; real width set per-image in JS from natural size */
+  height: auto;             /* preserve native aspect ratio — never crop */
+  border-radius: 8px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+}
+
+/* === Brain dither tuning panel (temporary) === */
+#brainDitherControls {
+  display: none !important;   /* hidden from view (dev tuning panel) */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 100%;
+  background: rgba(10, 10, 12, 0.92);
+  border-right: 1px solid #222225;
+  box-shadow: 5px 0 25px rgba(0,0,0,0.5);
+  padding: 20px;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  z-index: 10;
+  pointer-events: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+#brainDitherControls::-webkit-scrollbar { width: 6px; }
+#brainDitherControls::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+#brainDitherControls h2 {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+#brainDitherControls .bd-group { display: flex; flex-direction: column; gap: 6px; }
+#brainDitherControls .bd-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888890;
+  font-weight: 600;
+}
+#brainDitherControls .bd-val { color: #fff; }
+#brainDitherControls input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #2a2a2a;
+  border-radius: 3px;
+  outline: none;
+}
+#brainDitherControls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+}
+#brainDitherControls select,
+#brainDitherControls input[type="color"] {
+  width: 100%;
+  padding: 7px 10px;
+  background: #1a1a1c;
+  border: 1px solid #222225;
+  color: #fff;
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+#brainDitherControls input[type="color"] { height: 36px; padding: 2px 4px; }
+#brainDitherControls .bd-dump {
+  margin-top: 4px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  padding: 9px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+#brainDitherControls .bd-dump:hover { background: #2563eb; }
+
+/* === Audio Visualiser overlay (particle wave) — MOUTH === */
+#audioViz-overlay {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+#audioViz-overlay.inside-audioViz {
+  opacity: 1;
+  pointer-events: auto;
+}
+#audioVizCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Glassy control panel */
+#audioVizPanel {
+  position: absolute;
+  left: 28px;
+  bottom: 28px;
+  width: 300px;
+  padding: 16px 18px 18px;
+  background: rgba(16, 16, 18, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #f4f4f6;
+}
+#audioVizPanel h1 { margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .3px; }
+#audioVizPanel .av-sub { margin: 0 0 14px; font-size: 11px; color: #8a8a92; }
+#audioVizPanel .av-drop {
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #8a8a92;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, color .2s;
+}
+#audioVizPanel .av-drop:hover,
+#audioVizPanel .av-drop.hover { border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.04); color: #f4f4f6; }
+#audioVizPanel .av-drop strong { color: #f4f4f6; font-weight: 600; }
+#audioVizPanel .av-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+#audioVizPanel .av-track { font-size: 11.5px; color: #8a8a92; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#audioVizPanel button.av-play {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform .15s, opacity .2s;
+}
+#audioVizPanel button.av-play:hover { transform: scale(1.06); }
+#audioVizPanel button.av-play:disabled { opacity: .35; cursor: default; transform: none; }
+#audioVizPanel button.av-play svg { width: 16px; height: 16px; }
+#audioVizPanel .av-seek { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+#audioVizPanel .av-seek input { flex: 1; }
+#audioVizPanel .av-time { font-size: 10.5px; color: #8a8a92; font-variant-numeric: tabular-nums; min-width: 34px; }
+#audioVizPanel input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+}
+#audioVizPanel input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+#audioVizPanel .av-vol { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+#audioVizPanel .av-vol svg { width: 14px; height: 14px; opacity: .6; flex: none; }
+#audioVizPanel .av-vol input { flex: 1; }

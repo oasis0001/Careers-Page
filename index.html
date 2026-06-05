@@ -294,7 +294,7 @@
     opacity: 0;
   }
   #brainLeaders .brain-node { fill: #ffffff; }
-  /* tagline labels (DOM, billboarded — always upright/facing camera) */
+  /* floating image cards (DOM, billboarded — always upright/facing camera) */
   #brainLabels {
     position: absolute;
     inset: 0;
@@ -305,20 +305,15 @@
     position: absolute;
     top: 0;
     left: 0;
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 400;
-    font-size: 17px;          /* ← tag text size (all tags share this) */
-    letter-spacing: 0.3px;
-    line-height: 1;
-    text-transform: uppercase;
-    color: #0a0a0a;                          /* dark text on the light box */
-    white-space: nowrap;
-    padding: 5px 11px;
-    background: rgba(196, 196, 198, 0.82);   /* light frosted-grey box, like the reference */
-    backdrop-filter: blur(3px) saturate(110%);
-    -webkit-backdrop-filter: blur(3px) saturate(110%);
     opacity: 0;
     will-change: transform, opacity;
+  }
+  #brainLabels .brain-tag img {
+    display: block;
+    width: 168px;             /* fallback; real width set per-image in JS from natural size */
+    height: auto;             /* preserve native aspect ratio — never crop */
+    border-radius: 8px;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
   }
 
   /* === Brain dither tuning panel (temporary) === */
@@ -935,6 +930,8 @@
     // ---- THE VOID: multi-axis architectural grids (monochrome) ----
     const GRID_MAIN  = new THREE.Color(0x5a5a5a);   // dim base lines (always visible)
     const GRID_GLOW  = new THREE.Color(0xffffff);   // bright head of the travelling pulse
+    const GRID_GLOW_BLUE = new THREE.Color(0x3d7bff); // some sweeps glow blue instead of white
+    const GRID_BLUE_PORTION = 1 / 11;                 // white:blue ≈ 10:1 (≈1 in 11 sweeps blue)
 
     // === MASTER SWEEP SPEED — raise = faster pulses, lower = slower. ===
     // (Each line still gets its own per-line variation on top of this.)
@@ -1031,6 +1028,8 @@
       uniform float uPeriod;     // phases repeat every N cells (seamless wrap period)
       uniform vec3  uColor;
       uniform vec3  uGlow;
+      uniform vec3  uGlowAlt;     // blue glow for a fraction of the sweeps
+      uniform float uBluePortion; // chance a sweep glows blue (white:blue ratio)
       varying vec3  vWorld;
       varying float vType;
       varying float vFlow;
@@ -1040,6 +1039,7 @@
         bool  isRail = vType > 0.5;
         float base   = isRail ? uRailBase : uOpacity;
         float pulse  = 0.0;
+        float blue   = 0.0;   // 1.0 = this sweep glows blue instead of white
         if (isRail) {
           // Dashes flowing along the rail toward the camera. Driven by WORLD Z +
           // time, repeating every cell → perfectly periodic, so the camera's
@@ -1050,6 +1050,9 @@
           float head = exp(-(dd * dd) / 0.0016);
           float tail = exp(-(dd * dd) / 0.05) * 0.30;
           pulse = clamp(head + tail, 0.0, 1.0);
+          // Per-rail colour roll: a fixed fraction of rails glow blue (the whole rail).
+          float ch = fract(sin(vRnd.x * 127.1 + vRnd.y * 311.7 + vRnd.z * 74.7) * 43758.5453);
+          blue = step(ch, uBluePortion);
         } else {
           // Comet sweep running ALONG the frame line. Phase/speed/dir come from
           // the cross-section seed AND a per-layer random offset that repeats every
@@ -1066,9 +1069,15 @@
           float headG = exp(-(d * d) / 0.0016);        // tight bright core
           float tail  = exp(-(d * d) / 0.05) * 0.32;   // soft halo
           pulse = clamp(headG + tail, 0.0, 1.0);
+          // Per-sweep colour roll (varies per layer, so the SAME line is sometimes
+          // white, sometimes blue on different passes) — depends only on the wrapped
+          // layer index, so the camera's seamless wrap is preserved.
+          float ch = fract(sin(mod(layer, uPeriod) * 57.31 + vRnd.x * 73.13 + lh * 19.7) * 43758.5453);
+          blue = step(ch, uBluePortion);
         }
+        vec3  glow = mix(uGlow, uGlowAlt, blue);
         float a   = clamp(base + pulse * 0.95, 0.0, 1.0);
-        vec3  col = mix(uColor, uGlow, pulse) + uGlow * pulse * 0.55;
+        vec3  col = mix(uColor, glow, pulse) + glow * pulse * 0.55;
         gl_FragColor = vec4(col, a);
         #include <fog_fragment>
       }
@@ -1085,6 +1094,8 @@
             uRailBase: { value: railBase },
             uColor:    { value: GRID_MAIN },
             uGlow:     { value: GRID_GLOW },
+            uGlowAlt:     { value: GRID_GLOW_BLUE },
+            uBluePortion: { value: GRID_BLUE_PORTION },
           },
           gridFlow
         ),
@@ -1124,6 +1135,7 @@
       buildLattice(COR_W, COR_H, COR_DEPTH, corDivX, corDivY, corDivZ, COR_CZ),
       gridMaterial(0.16, 0.10)   // (frame-line opacity, rail base opacity)
     );
+    gridMesh.renderOrder = -1;   // always draw the grid BEHIND the screens (no lines over screens)
     scene.add(gridMesh);
 
     // ---- FLOATING SCREENS (left & right walls, infinite loop) ----
@@ -1147,12 +1159,15 @@
 
     // side: -1 = left, +1 = right · z: position along ONE period (0..1) · y: vertical offset
     // scale (optional): per-screen size multiplier on top of SCREEN_SCALE (default 1)
+    // sx    (optional): horizontal squash to cancel the off-axis perspective stretch a
+    //                   screen picks up when it sits far out toward the wall (wide-FOV
+    //                   edge distortion). 1 = none; <1 narrows the screen back to true.
     const SCREEN_LAYOUT = [
       { src: '3DSpaceScreens/Frame 2147240429.png', side: -1, z: 0.08, y:  240 },
       { src: '3DSpaceScreens/Frame 2147240438.png', side:  1, z: 0.26, y: -140 },
       { src: '3DSpaceScreens/Frame 2147240439.png', side: -1, z: 0.46, y: -260 },
       { src: '3DSpaceScreens/Frame 2147240442.png', side:  1, z: 0.66, y:  200, scale: 0.6 },
-      { src: '3DSpaceScreens/Frame 2147240441.png', side: -1, z: 0.84, y:   40 },
+      { src: '3DSpaceScreens/Frame 2147240441.png', side: -1, z: 0.84, y:   40, sx: 0.83 },
     ];
 
     const screenGroup = new THREE.Group();
@@ -1172,11 +1187,14 @@
         // relative scale between screens. `cfg.scale` (optional) shrinks/grows just
         // this one screen on top of the master SCREEN_SCALE.
         const s = SCREEN_SCALE * (cfg.scale || 1);
-        const w = t.image.width  * s;
+        const w = t.image.width  * s * (cfg.sx || 1);   // sx squashes width to undo off-axis stretch
         const h = t.image.height * s;
         meshes.forEach((m) => { m.scale.set(w, h, 1); m.visible = true; });
       });
       SCREEN_TILES.forEach((p) => {
+        // A higher renderOrder than the grid → the screens always draw ON TOP of the
+        // lattice lines, so no grid line ever overlays a screen. depthWrite stays off
+        // so the transparent (rounded-corner) areas still let the grid show through.
         const mat = new THREE.MeshBasicMaterial({
           map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false,
         });
@@ -1187,6 +1205,7 @@
           CAM_INSIDE_Z + (cfg.z + p) * gridPeriodZ
         );
         mesh.rotation.y = -cfg.side * SCREEN_TILT;   // angle inward toward the flight path
+        mesh.renderOrder = 1;                        // draw after (over) the grid lines
         mesh.visible = false;                        // shown once the texture has sized it
         screenGroup.add(mesh);
         meshes.push(mesh);
@@ -1580,27 +1599,49 @@
     let TILT  = { x: 0.0, y: -1.2, z: 0.0 };
     let ZOOM  = 1.0;
 
-    // Tagline pool — reference lines + generated AI-news / neural-process flavour
+    // Image pool — screens that float around the brain (drawn from BrainSpaceScreens/)
     const POOL = [
-      "OPTIMISING OUTPUT", "REMOVING ALL BIAS", "RUNNING SIMULATIONS", "SYNCING NEURAL PATHWAYS",
-      "PARSING THE FEED", "INDEXING AI NEWS", "TRAINING ON HEADLINES", "FETCHING NEW MODELS",
-      "DEBATING AGI TIMELINES", "RANKING BENCHMARKS", "EMBEDDING EVERYTHING", "PREDICTING NEXT TOKEN",
-      "SUMMARISING ARXIV", "DOOMSCROLLING THE TIMELINE", "UPDATING WORLD MODEL", "ROUTING ATTENTION",
-      "PRUNING DEAD NEURONS", "REFRESHING THE FEED", "FINE-TUNING OPINIONS", "DECODING THE HYPE",
-      "BENCHMARKING RIVALS", "CRAWLING THE WEB", "CACHING HOT TAKES", "ALIGNING INCENTIVES",
-      "COMPRESSING MEMORIES", "SCANNING FOR SIGNAL", "ANOTHER MODEL DROPPED", "READING THE CHANGELOG",
-      "QUESTIONING THE BENCHMARK", "GENERATING TAKES",
+      "BrainSpaceScreens/Frame 2147240451.png",
+      "BrainSpaceScreens/Frame 2147240452.png",
+      "BrainSpaceScreens/Group 2147235889.png",
+      "BrainSpaceScreens/Group 2147235891.png",
+      "BrainSpaceScreens/Group 2147235893.png",
+      "BrainSpaceScreens/Group 2147235894.png",
+      "BrainSpaceScreens/Group 2147235895.png",
+      "BrainSpaceScreens/Group 2147235896.png",
+      "BrainSpaceScreens/Group 2147235897.png",
+      "BrainSpaceScreens/Group 2147235899.png",
     ];
+    // Screens that may ONLY appear on a top anchor, never the bottom.
+    const TOP_ONLY = ["BrainSpaceScreens/Group 2147235899.png"];
+
+    // Per-image on-screen size: scale each screen from its NATIVE width so the
+    // wide frames, square logos and the long logo strip keep their true relative
+    // scale (matching the reference) instead of all being squashed to one width.
+    const IMG_SCALE = 0.12, IMG_MIN = 130, IMG_MAX = 360;
+    function sizeImg(img) {
+      const nw = img.naturalWidth;
+      if (!nw) return;
+      img.style.width = Math.max(IMG_MIN, Math.min(IMG_MAX, nw * IMG_SCALE)) + 'px';
+    }
+
     let bag = [];
-    function drawTag() {
-      if (!bag.length) {
-        bag = POOL.slice();
-        for (let i = bag.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [bag[i], bag[j]] = [bag[j], bag[i]];
-        }
+    function refillBag() {
+      bag = POOL.slice();
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
       }
-      return bag.pop();
+    }
+    function drawTag(isTop) {
+      if (!bag.length) refillBag();
+      if (isTop) return bag.pop();
+      // Bottom anchor: pick the last item that isn't restricted to the top.
+      for (let i = bag.length - 1; i >= 0; i--) {
+        if (!TOP_ONLY.includes(bag[i])) return bag.splice(i, 1)[0];
+      }
+      refillBag();              // bag held only top-only items → reshuffle and retry
+      return drawTag(false);
     }
 
     // Three.js (offscreen) → ASCII
@@ -1684,13 +1725,17 @@
       ];
       DIRS.forEach((d) => {
         const dir = new THREE.Vector3(d[0], d[1], d[2]).normalize();
+        const top = d[1] > 0;        // top section (+Y) vs bottom section (−Y)
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         dot.setAttribute('width', '5'); dot.setAttribute('height', '5'); dot.setAttribute('class', 'brain-node');
         svg.appendChild(dot);
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('class', 'brain-leader'); svg.appendChild(line);
-        const el = document.createElement('div'); el.className = 'brain-tag'; labels.appendChild(el);
-        anchors.push({ dir, dot, line, el, op: 0, hidden: true, accent: false });
+        const el = document.createElement('div'); el.className = 'brain-tag';
+        const img = document.createElement('img');
+        img.addEventListener('load', () => sizeImg(img));   // resize from native dims each swap
+        el.appendChild(img); labels.appendChild(el);
+        anchors.push({ dir, top, dot, line, el, img, op: 0, hidden: true });
       });
     }
 
@@ -1710,10 +1755,9 @@
         const toCam = camera.position.clone().sub(world).normalize();
         const front = nrm.dot(toCam) > 0.16;
 
-        // Re-entering the front → assign a fresh tagline ("comes back as a different line")
+        // Re-entering the front → swap in a fresh random screen ("comes back as a different one")
         if (front && a.hidden) {
-          a.el.textContent = drawTag();
-          a.el.classList.toggle('accent', a.accent);
+          a.img.src = drawTag(a.top);
           a.hidden = false;
         }
         if (!front) a.hidden = true;

@@ -18,7 +18,7 @@
         * { box-sizing: border-box; }
 
         body {
-            background-color: var(--bg-main);
+            background-color: #010103;   /* match the dither fill so there's no visible box */
             color: var(--text-main);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
@@ -31,7 +31,7 @@
             width: 320px;
             background: var(--bg-panel);
             border-right: 1px solid var(--border);
-            display: flex;
+            display: none;          /* panel hidden — brain shown identically to index.html */
             flex-direction: column;
             padding: 24px;
             gap: 20px;
@@ -113,15 +113,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: radial-gradient(circle at center, #111 0%, #000 100%);
+            background: #010103;          /* same black as the canvas — no box */
         }
 
         canvas {
             image-rendering: pixelated;
             max-width: 95%;
             max-height: 95%;
-            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+            cursor: grab;
+            touch-action: none;     /* let drag-to-orbit own touch gestures */
         }
+        canvas:active { cursor: grabbing; }
 
         .section-title {
             font-size: 0.7rem;
@@ -175,26 +177,43 @@
     <div class="section-title">Dither</div>
 
     <div class="control-group">
-        <div class="control-header"><span>Character Set</span></div>
+        <div class="control-header"><span>Render Mode</span></div>
         <select id="charset">
+            <option value="ascii">Standard ASCII (Ñ@#...)</option>
             <option value="blocks">Block Pixels (█ ▓ ▒ ░)</option>
-            <option value="ascii" selected>Standard ASCII (Ñ@#...)</option>
             <option value="binary">Binary (1 0)</option>
-            <option value="minimal">Minimal (+ - .)</option>
+            <option value="minimal" selected>Minimal (# * + - .)</option>
+            <option value="halftone">Circle Halftone (○ •)</option>
         </select>
     </div>
 
     <div class="control-group">
         <div class="control-header"><span>Tint Color</span></div>
-        <input type="color" id="tintColor" value="#1a56ff">
+        <input type="color" id="tintColor" value="#C8C8C8">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Tones (posterize)</span>
+            <span id="tonesVal" class="val-display">2</span>
+        </div>
+        <input type="range" id="tones" min="2" max="8" value="2">
+    </div>
+
+    <div class="control-group">
+        <div class="control-header">
+            <span>Highlight Intensity</span>
+            <span id="highlightVal" class="val-display">1.00</span>
+        </div>
+        <input type="range" id="highlight" min="0.2" max="1.0" step="0.05" value="1.0">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Grid Resolution</span>
-            <span id="resolutionVal" class="val-display">12</span>
+            <span id="resolutionVal" class="val-display">9</span>
         </div>
-        <input type="range" id="resolution" min="2" max="25" value="12">
+        <input type="range" id="resolution" min="2" max="25" value="9">
     </div>
 
     <div class="control-group">
@@ -208,25 +227,25 @@
     <div class="control-group">
         <div class="control-header">
             <span>Brightness Threshold</span>
-            <span id="thresholdVal" class="val-display">1</span>
+            <span id="thresholdVal" class="val-display">1.7</span>
         </div>
-        <input type="range" id="threshold" min="0.1" max="2.0" step="0.1" value="1">
+        <input type="range" id="threshold" min="0.1" max="2.0" step="0.1" value="1.7">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Shadow Brightness</span>
-            <span id="shadowLiftVal" class="val-display">25</span>
+            <span id="shadowLiftVal" class="val-display">28</span>
         </div>
-        <input type="range" id="shadowLift" min="0" max="200" value="25">
+        <input type="range" id="shadowLift" min="0" max="200" value="28">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Animated Noise</span>
-            <span id="noiseVal" class="val-display">122</span>
+            <span id="noiseVal" class="val-display">47</span>
         </div>
-        <input type="range" id="noise" min="0" max="150" value="122">
+        <input type="range" id="noise" min="0" max="150" value="47">
     </div>
 
     <div class="control-group">
@@ -242,9 +261,9 @@
     <div class="control-group">
         <div class="control-header">
             <span>Rotation Speed Y</span>
-            <span id="rotYVal" class="val-display">1.0</span>
+            <span id="rotYVal" class="val-display">0.42</span>
         </div>
-        <input type="range" id="rotY" min="-3" max="3" step="0.1" value="1.0">
+        <input type="range" id="rotY" min="-3" max="3" step="0.01" value="0.42">
     </div>
 
     <div class="control-group">
@@ -268,15 +287,15 @@
             <span>Tilt X</span>
             <span id="tiltXVal" class="val-display">0</span>
         </div>
-        <input type="range" id="tiltX" min="-1.5" max="1.5" step="0.05" value="0">
+        <input type="range" id="tiltX" min="-3.2" max="3.2" step="0.05" value="0">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Tilt Y</span>
-            <span id="tiltYVal" class="val-display">-1.5</span>
+            <span id="tiltYVal" class="val-display">-1.2</span>
         </div>
-        <input type="range" id="tiltY" min="-1.5" max="1.5" step="0.05" value="-1.5">
+        <input type="range" id="tiltY" min="-3.2" max="3.2" step="0.05" value="-1.2">
     </div>
 
     <div class="control-group">
@@ -284,28 +303,28 @@
             <span>Tilt Z</span>
             <span id="tiltZVal" class="val-display">0.0</span>
         </div>
-        <input type="range" id="tiltZ" min="-1.5" max="1.5" step="0.05" value="0">
+        <input type="range" id="tiltZ" min="-3.2" max="3.2" step="0.05" value="0">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Camera Zoom</span>
-            <span id="zoomVal" class="val-display">1.4</span>
+            <span id="zoomVal" class="val-display">1.0</span>
         </div>
-        <input type="range" id="zoom" min="0.6" max="3.0" step="0.05" value="1.4">
+        <input type="range" id="zoom" min="0.5" max="3.0" step="0.05" value="1.0">
     </div>
 
     <div class="control-group">
         <div class="control-header"><span>Model Color</span></div>
-        <input type="color" id="modelColor" value="#3050ff">
+        <input type="color" id="modelColor" value="#cfcfcf">
     </div>
 
     <div class="control-group">
         <div class="control-header">
             <span>Light Intensity</span>
-            <span id="lightIntensityVal" class="val-display">12</span>
+            <span id="lightIntensityVal" class="val-display">6</span>
         </div>
-        <input type="range" id="lightIntensity" min="0" max="40" step="0.5" value="12">
+        <input type="range" id="lightIntensity" min="0" max="40" step="0.5" value="6">
     </div>
 </div>
 
@@ -328,6 +347,46 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ╔══════════════════════════════════════════════════════════════════════╗
+    // ║  CAMERA & AUTO-ROTATION SETTINGS  —  tweak these three values          ║
+    // ╠══════════════════════════════════════════════════════════════════════╣
+    // ║  AUTO_ROTATE_SPEED : idle spin speed. Higher = faster, 0 = no spin.    ║
+    // ║                      ~0.5 ≈ one slow lap every ~2 minutes.             ║
+    // ║  VERTICAL_LIMIT_DEG : how far you may orbit toward the top/bottom from  ║
+    // ║                      the side view, in degrees (max ~89 = nearly pole).║
+    // ║  DRAG_SENSITIVITY   : click-drag rotate speed.                         ║
+    // ╚══════════════════════════════════════════════════════════════════════╝
+    const AUTO_ROTATE_SPEED  = 1.5;
+    const VERTICAL_LIMIT_DEG = 25;
+    const DRAG_SENSITIVITY   = 1.0;
+
+    // ╔══════════════════════════════════════════════════════════════════════╗
+    // ║  REGION HIGHLIGHT SETTINGS  —  hover a half of the brain to invert it  ║
+    // ╠══════════════════════════════════════════════════════════════════════╣
+    // ║  The brain is ONE mesh, split SPATIALLY into just two halves: LEFT &   ║
+    // ║  RIGHT. Hovering a half inverts its tones (negative) instead of a      ║
+    // ║  colour tint. DEBUG_REGIONS = true paints the two halves so you can    ║
+    // ║  confirm the split is left/right (not front/back); if it lands wrong,  ║
+    // ║  change REGION.splitAxis ('x'|'y'|'z') or flip REGION.splitSign.       ║
+    // ╚══════════════════════════════════════════════════════════════════════╝
+    const DEBUG_REGIONS = false;
+
+    const REGION = {
+        splitAxis: 'x',   // LOCAL axis of the midline between the two halves
+        splitSign: 1,     // flip to swap which half counts as "left"
+        splitAt:   0.5,   // 0..1 position of the dividing line along that axis
+    };
+
+    const HIGHLIGHT = {
+        fadeSpeed: 9.0,   // damp() rate — higher = snappier tone-invert fade in/out
+        tintBlend: 0.0,   // (kept for the colour-aware dither path; unused for inversion)
+    };
+
+    // Region id → debug colour (Left, Right)
+    const REGION_DEBUG_COLORS = ['#ff5555', '#5599ff'];
+    const REGION_LEFT = 0, REGION_RIGHT = 1;
 
     // --- DOM ---
     const displayCanvas = document.getElementById('displayCanvas');
@@ -357,6 +416,12 @@
     const offscreenCanvas = document.createElement('canvas');
     const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
 
+    // Region mask canvas — a second, flat render where the hovered half is white
+    // and everything else black. The dither reads it per-cell to know which cells
+    // belong to the hovered half (so it can invert just those tones).
+    const maskCanvas = document.createElement('canvas');
+    const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+
     // --- ASCII charsets ---
     const charSets = {
         ascii:   "Ñ@#W$9876543210?!abc;:+=-,._ ",
@@ -373,6 +438,8 @@
         threshold:      document.getElementById('threshold'),
         contrast:       document.getElementById('contrast'),
         shadowLift:     document.getElementById('shadowLift'),
+        tones:          document.getElementById('tones'),
+        highlight:      document.getElementById('highlight'),
         charset:        document.getElementById('charset'),
         tintColor:      document.getElementById('tintColor'),
         rotY:           document.getElementById('rotY'),
@@ -387,7 +454,7 @@
     };
 
     ['resolution', 'noise', 'fps', 'threshold', 'contrast', 'shadowLift',
-     'rotY', 'rotX', 'rotZ', 'tiltX', 'tiltY', 'tiltZ', 'zoom',
+     'tones', 'highlight', 'rotY', 'rotX', 'rotZ', 'tiltX', 'tiltY', 'tiltZ', 'zoom',
      'lightIntensity'].forEach(key => {
         inputs[key].addEventListener('input', (e) => {
             document.getElementById(`${key}Val`).innerText = e.target.value;
@@ -410,23 +477,110 @@
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     camera.position.set(0, 0, 3);
 
-    // Lighting — a single rectangular area light from one side. No ambient,
-    // no fill, no rim → unlit side stays completely dark for high contrast.
+    // Lighting (mirrors index.html's brain rig):
+    // Key light — rectangular area light grazing from the right + behind, so the
+    // folds cast shadows into their crevices for strong groove definition.
     RectAreaLightUniformsLib.init();
 
-    const areaLight = new THREE.RectAreaLight(0xffffff, 12, 6, 6);
-    areaLight.position.set(4, 2, 3);
+    const areaLight = new THREE.RectAreaLight(0xffffff, 6, 6, 6);
+    areaLight.position.set(6, 1, -4);
     areaLight.lookAt(0, 0, 0);
     scene.add(areaLight);
+
+    // Gentle fill from the opposite side — keeps the shadowed hemisphere from
+    // crushing to pure black without flattening the shading.
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.45);
+    fillLight.position.set(-5, 1.5, 2);
+    scene.add(fillLight);
+    scene.add(fillLight.target);   // target stays at the brain centre (origin)
+
+    // Faint wrap-around base so the deepest crevices keep a trace of detail.
+    // (World-fixed soft ambient — fine to leave anchored as the camera orbits.)
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x0a0a10, 0.2));
+
+    // The key + fill lights must stay fixed relative to the VIEW (not the brain),
+    // exactly as they were when the brain spun under a static camera. We capture
+    // their offset from the camera at the default pose, then re-derive their world
+    // position each frame from the orbiting camera so the rig follows the camera.
+    const keyLightOffset  = new THREE.Vector3();
+    const fillLightOffset = new THREE.Vector3();
+    function updateLightRig() {
+        camera.updateMatrixWorld();
+        areaLight.position.copy(keyLightOffset).applyMatrix4(camera.matrixWorld);
+        areaLight.lookAt(0, 0, 0);
+        fillLight.position.copy(fillLightOffset).applyMatrix4(camera.matrixWorld);
+        // fillLight aims at its target (origin), so its direction follows too.
+    }
 
     // Group wraps the brain so rotation pivots around its geometric center
     const brainGroup = new THREE.Group();
     scene.add(brainGroup);
 
+    // --- Interactive orbit camera ---
+    // Listens on the VISIBLE canvas. Click-drag orbits the camera around the
+    // brain; horizontal is unrestricted (full 360°), vertical is clamped so you
+    // can tip toward the top/bottom only up to VERTICAL_LIMIT_DEG. When you're
+    // not dragging, it auto-rotates slowly.
+    const controls = new OrbitControls(camera, displayCanvas);
+    controls.target.set(0, 0, 0);
+    controls.enablePan = false;          // brain stays centred
+    controls.enableZoom = false;         // fixed framing (distance set on load)
+    controls.enableDamping = true;       // smooth, weighty drag
+    controls.dampingFactor = 0.045;      // lower = more glide/inertia after release
+    controls.rotateSpeed = DRAG_SENSITIVITY * 0.7;   // gentler, finer drag
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
+    // Polar angle: π/2 is the side-on equator. Clamp symmetrically around it so
+    // the camera can never reach straight-over-the-top or straight-under.
+    const polarHalfRange = THREE.MathUtils.degToRad(VERTICAL_LIMIT_DEG);
+    controls.minPolarAngle = Math.PI / 2 - polarHalfRange;
+    controls.maxPolarAngle = Math.PI / 2 + polarHalfRange;
+
+    // --- Hover picking (region highlight) ---
+    // Pointer position → NDC via the VISIBLE canvas's displayed rect, so it's
+    // resolution-independent (internal 1440×750 vs CSS-scaled size doesn't matter).
+    // Only track hover when no button is held, so OrbitControls keeps drag-to-orbit.
+    function setNdcFromEvent(e) {
+        const rect = displayCanvas.getBoundingClientRect();
+        ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+        ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+    }
+    displayCanvas.addEventListener('pointermove', (e) => {
+        pointerInside = true;
+        if (e.buttons !== 0) return;     // dragging → let the camera orbit, skip pick
+        setNdcFromEvent(e);
+    });
+    displayCanvas.addEventListener('pointerleave', () => {
+        pointerInside = false;
+        hoveredRegion = -1;
+    });
+
+    // Raycast the brain mesh and resolve the hovered lobe from the hit face.
+    function doPick() {
+        if (!isBrainLoaded || !brainMesh || !pointerInside) { hoveredRegion = -1; return; }
+        raycaster.setFromCamera(ndc, camera);
+        const hits = raycaster.intersectObject(brainMesh, false);
+        if (!hits.length || !hits[0].face) { hoveredRegion = -1; return; }
+        const ra = brainGeometry.getAttribute('region');
+        const f = hits[0].face;
+        // majority vote across the face's 3 verts → stable on lobe borders
+        const a = Math.round(ra.getX(f.a)), b = Math.round(ra.getX(f.b)), c = Math.round(ra.getX(f.c));
+        hoveredRegion = (a === c) ? a : (b === c ? b : a);
+    }
+
     let brainModel = null;
     let baseDistance = 3;
     let isBrainLoaded = false;
     let currentModelColor = inputs.modelColor.value;
+
+    // Region-highlight state (set once the brain mesh loads)
+    let brainMesh = null, brainGeometry = null, brainMaterial = null;
+    const raycaster = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    let hoveredRegion = -1;              // -1 = nothing hovered
+    let pointerInside = false;
+    let highlightMix = 0;                // smoothed 0..1 invert amount, driven each frame
+    let maskPixels = null;               // per-cell hovered-half mask for the dither
 
     function applyModelColor(hex) {
         if (!brainModel) return;
@@ -451,6 +605,59 @@
         areaLight.intensity = parseFloat(e.target.value);
     });
 
+    // Split every vertex into LEFT (0) or RIGHT (1) by its normalised position
+    // along REGION.splitAxis. Local space is tilt-independent, so the split is
+    // stable as the brain spins. Writes a `region` attribute; in DEBUG mode also
+    // writes vertex colours so the two halves are directly visible for tuning.
+    function classifyRegions(geometry) {
+        geometry.computeBoundingBox();
+        const bb = geometry.boundingBox;
+        const min = bb.min, size = new THREE.Vector3().subVectors(bb.max, bb.min);
+        const pos = geometry.getAttribute('position');
+        const n = pos.count;
+        const region = new Float32Array(n);
+        const colors = DEBUG_REGIONS ? new Float32Array(n * 3) : null;
+        const dbg = DEBUG_REGIONS ? REGION_DEBUG_COLORS.map(h => new THREE.Color(h)) : null;
+
+        const axis = REGION.splitAxis;
+        const get = axis === 'x' ? 'getX' : axis === 'y' ? 'getY' : 'getZ';
+        const s = axis === 'x' ? size.x : axis === 'y' ? size.y : size.z;
+        const m = axis === 'x' ? min.x : axis === 'y' ? min.y : min.z;
+
+        for (let i = 0; i < n; i++) {
+            let t = s ? (pos[get](i) - m) / s : 0.5;    // 0..1 along the split axis
+            if (REGION.splitSign < 0) t = 1 - t;
+            const id = t < REGION.splitAt ? REGION_LEFT : REGION_RIGHT;
+            region[i] = id;
+            if (colors) { const c = dbg[id]; colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b; }
+        }
+        geometry.setAttribute('region', new THREE.BufferAttribute(region, 1));
+        if (colors) geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    }
+
+    // Flat mask material: renders the hovered half WHITE and the rest BLACK
+    // (within the brain silhouette). We render the scene once more with this as an
+    // overrideMaterial to produce a per-pixel "is this the hovered half?" mask that
+    // the dither samples — so it can invert ONLY those cells' tones without
+    // touching the lit render (which is what caused the whole-side-white flood).
+    const maskMaterial = new THREE.ShaderMaterial({
+        uniforms: { uHoveredRegion: { value: -1.0 } },
+        vertexShader: `
+            attribute float region;
+            varying float vRegion;
+            void main() {
+                vRegion = region;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }`,
+        fragmentShader: `
+            varying float vRegion;
+            uniform float uHoveredRegion;
+            void main() {
+                float isHot = step(abs(vRegion - uHoveredRegion), 0.5);
+                gl_FragColor = vec4(vec3(isHot), 1.0);
+            }`,
+    });
+
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
     dracoLoader.setDecoderConfig({ type: 'js' });
@@ -466,11 +673,17 @@
             // give every mesh a clean lit material so we control look uniformly
             brainModel.traverse(node => {
                 if (node.isMesh) {
-                    node.material = new THREE.MeshStandardMaterial({
+                    const mat = new THREE.MeshStandardMaterial({
                         color: new THREE.Color(currentModelColor),
-                        roughness: 0.55,
-                        metalness: 0.05
+                        roughness: 0.78,
+                        metalness: 0.0
                     });
+                    if (DEBUG_REGIONS) mat.vertexColors = true;
+                    node.material = mat;
+                    // single-mesh model — capture refs for region picking + highlight
+                    brainMesh = node;
+                    brainGeometry = node.geometry;
+                    brainMaterial = mat;
                 }
             });
 
@@ -480,11 +693,27 @@
             const center = box.getCenter(new THREE.Vector3());
             brainModel.position.sub(center);
 
+            // partition the single mesh into 5 spatial lobes (writes `region` attr)
+            if (brainGeometry) classifyRegions(brainGeometry);
+
             const maxDim = Math.max(size.x, size.y, size.z);
             const fovRad = (camera.fov * Math.PI) / 180;
             baseDistance = (maxDim / (2 * Math.tan(fovRad / 2)));
 
             brainGroup.add(brainModel);
+
+            // Place the camera at the framing distance and lock the orbit radius
+            // there (zoom disabled), then sync the controls to that position.
+            camera.position.set(0, 0, baseDistance * parseFloat(inputs.zoom.value));
+            controls.update();
+
+            // Snapshot each light's position relative to the camera at this default
+            // pose; updateLightRig() reapplies it every frame so the lights orbit
+            // with the camera (locked to the view, as before).
+            camera.updateMatrixWorld();
+            keyLightOffset.copy(areaLight.position).applyMatrix4(camera.matrixWorld.clone().invert());
+            fillLightOffset.copy(fillLight.position).applyMatrix4(camera.matrixWorld.clone().invert());
+
             isBrainLoaded = true;
             setStatus('', 'ok');
         },
@@ -508,27 +737,19 @@
     );
 
     // --- Canvas sizing ---
-    function resizeCanvases() {
-        const container = document.getElementById('canvas-container');
-        const maxWidth = container.clientWidth - 40;
-        const maxHeight = container.clientHeight - 40;
-
-        // square-ish viewport that fits the container
-        const side = Math.max(200, Math.min(maxWidth, maxHeight));
-        const w = Math.floor(side);
-        const h = Math.floor(side);
-
-        displayCanvas.width = w;
-        displayCanvas.height = h;
-        offscreenCanvas.width = w;
-        offscreenCanvas.height = h;
-
-        renderer.setSize(w, h, false);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-    }
-    window.addEventListener('resize', resizeCanvases);
-    resizeCanvases();
+    // Fixed 1440×750 stage — identical to index.html's brain — so the dither grid,
+    // framing and camera aspect map 1:1. CSS scales the display canvas down to fit
+    // the viewport while preserving this aspect ratio.
+    const W = 1440, H = 750;
+    displayCanvas.width = W;
+    displayCanvas.height = H;
+    offscreenCanvas.width = W;
+    offscreenCanvas.height = H;
+    maskCanvas.width = W;
+    maskCanvas.height = H;
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
 
     // --- Helpers ---
     function hexToRgb(hex) {
@@ -547,45 +768,52 @@
         const dt = Math.min(0.1, (now - lastFrameTime) / 1000);
         lastFrameTime = now;
 
-        const fps = parseInt(inputs.fps.value);
-        const interval = 1000 / fps;
-        if (now - lastDrawTime < interval) return;
-        lastDrawTime = now;
-
-        // 1. update rotation and tilt
+        // The brain itself stays fixed (only its tilt orientation); the CAMERA
+        // orbits it — via drag, or the slow auto-rotate when idle. Camera + render
+        // run every frame so motion is smooth and frame-rate independent; only the
+        // dither below is throttled to FPS.
         if (isBrainLoaded) {
-            const rotY = parseFloat(inputs.rotY.value);
-            const rotX = parseFloat(inputs.rotX.value);
-            const rotZ = parseFloat(inputs.rotZ.value);
-            brainGroup.rotation.y += rotY * dt;
-            brainGroup.rotation.x += rotX * dt;
-            brainGroup.rotation.z += rotZ * dt;
-            // tilt is an absolute offset on top of the spinning; apply via brainModel
-            // to keep brainGroup's rotation pure
             brainModel.rotation.set(
                 parseFloat(inputs.tiltX.value),
                 parseFloat(inputs.tiltY.value),
                 parseFloat(inputs.tiltZ.value)
             );
-        }
+            controls.update(dt);   // applies drag, auto-rotate and damping
+            updateLightRig();      // keep the light rig locked to the view
 
-        // 2. camera zoom
-        const zoom = parseFloat(inputs.zoom.value);
-        camera.position.z = baseDistance * zoom;
-        camera.lookAt(0, 0, 0);
+            // Region hover: pick under the cursor (brain spins, so re-pick each
+            // frame) and ease the tone inversion of the hovered half in/out.
+            doPick();
+            const want = (hoveredRegion >= 0 && !DEBUG_REGIONS) ? 1 : 0;
+            highlightMix = THREE.MathUtils.damp(highlightMix, want, HIGHLIGHT.fadeSpeed, dt);
 
-        // 3. render three.js
-        if (isBrainLoaded) {
             renderer.render(scene, camera);
         }
 
-        // 4. copy three's output to the 2D offscreen so we can sample pixels
+        // Only the ASCII dither (sampling + draw) is throttled to the chosen FPS.
+        const fps = parseInt(inputs.fps.value);
+        if (now - lastDrawTime < 1000 / fps) return;
+        lastDrawTime = now;
+
+        // Grab the lit render (brightness source for the dither).
         offCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
         if (isBrainLoaded) {
             offCtx.drawImage(threeCanvas, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
         }
 
-        // 5. run ASCII dither over the offscreen image
+        // Second pass: render the flat region mask only while a half is highlighted,
+        // so the dither knows which cells to tone-invert. Skipped entirely otherwise.
+        maskPixels = null;
+        if (isBrainLoaded && hoveredRegion >= 0 && highlightMix > 0.004) {
+            maskMaterial.uniforms.uHoveredRegion.value = hoveredRegion;
+            scene.overrideMaterial = maskMaterial;
+            renderer.render(scene, camera);
+            scene.overrideMaterial = null;
+            maskCtx.clearRect(0, 0, W, H);
+            maskCtx.drawImage(threeCanvas, 0, 0, W, H);
+            maskPixels = maskCtx.getImageData(0, 0, W, H).data;
+        }
+
         drawDither();
     }
 
@@ -595,10 +823,15 @@
         const thresh = parseFloat(inputs.threshold.value);
         const contrast = parseFloat(inputs.contrast.value);
         const shadowLift = parseInt(inputs.shadowLift.value);
-        const density = charSets[inputs.charset.value];
+        const tones = parseInt(inputs.tones.value);
+        const highlight = parseFloat(inputs.highlight.value);
         const tint = hexToRgb(inputs.tintColor.value);
 
-        ctx.fillStyle = "#000";
+        // The render-mode dropdown drives both the mode and (for ASCII) the charset.
+        const mode = inputs.charset.value === 'halftone' ? 'halftone' : 'ascii';
+        const density = charSets[inputs.charset.value] || charSets.minimal;
+
+        ctx.fillStyle = "#010103";
         ctx.fillRect(0, 0, displayCanvas.width, displayCanvas.height);
 
         ctx.font = `bold ${res}px monospace`;
@@ -622,7 +855,8 @@
                 // skip transparent pixels — keep the dither inside the model silhouette
                 if (a < 128) continue;
 
-                let brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+                const srcLum = r * 0.299 + g * 0.587 + b * 0.114;
+                let brightness = srcLum;
                 brightness = ((brightness / 255 - 0.5) * contrast + 0.5) * 255;
                 brightness = brightness + shadowLift * (1 - Math.max(0, Math.min(255, brightness)) / 255);
 
@@ -630,14 +864,56 @@
                 brightness = (brightness * thresh) + noise;
                 brightness = Math.max(0, Math.min(255, brightness));
 
-                if (brightness < 10) continue;
+                if (brightness < 10) continue;   // silhouette decided on the NORMAL image → no flood
 
-                const charIndex = Math.floor((1 - brightness / 255) * (density.length - 1));
-                const char = density[charIndex];
+                // Tone inversion for the hovered half: flip this drawn cell's
+                // brightness (faded in by highlightMix). Because the skip above uses
+                // the un-inverted brightness, we re-tone the SAME cells instead of
+                // filling the dark areas — so the half reads as inverted, not white.
+                let bUse = brightness;
+                if (maskPixels && maskPixels[index] > 128) {
+                    bUse = brightness + (255 - 2 * brightness) * highlightMix;
+                }
 
-                const intensity = brightness / 255;
-                ctx.fillStyle = `rgb(${tint.r * intensity}, ${tint.g * intensity}, ${tint.b * intensity})`;
-                ctx.fillText(char, x + res / 2, y + res / 2);
+                // Posterize into `tones` hard brightness bands (no smooth midtones):
+                // the top band is user-controlled; lower bands keep their even step.
+                const lvl = Math.min(tones - 1, Math.floor((bUse / 255) * tones));
+                const intensity = (lvl === tones - 1) ? highlight : (lvl + 1) / tones;
+
+                // COLOR-AWARE: grey cells render exactly as before (global tint ×
+                // intensity), so the un-highlighted brain is unchanged. Cells that
+                // carry real colour (a highlighted lobe's tint/glow) keep their hue
+                // at the posterised brightness, so the highlight survives the dither.
+                let cr, cg, cb;
+                const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+                if (chroma < 18) {
+                    cr = tint.r * intensity; cg = tint.g * intensity; cb = tint.b * intensity;
+                } else {
+                    const norm = srcLum > 0 ? intensity / (srcLum / 255) : intensity;
+                    cr = r * norm; cg = g * norm; cb = b * norm;
+                    const tb = HIGHLIGHT.tintBlend;
+                    if (tb > 0) {
+                        cr = cr * (1 - tb) + tint.r * intensity * tb;
+                        cg = cg * (1 - tb) + tint.g * intensity * tb;
+                        cb = cb * (1 - tb) + tint.b * intensity * tb;
+                    }
+                }
+                const col = `rgb(${Math.min(255, cr) | 0}, ${Math.min(255, cg) | 0}, ${Math.min(255, cb) | 0})`;
+                const cx = x + res / 2, cy = y + res / 2;
+
+                if (mode === 'halftone') {
+                    // Uniform-size rings, never filled. Brightness drives the stroke
+                    // weight: highlights = thick bright rings, shadows = thin faint.
+                    ctx.lineWidth = Math.max(0.5, intensity * res * 0.2);
+                    ctx.strokeStyle = col;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, res * 0.42, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else {
+                    const charIndex = Math.floor((1 - intensity) * (density.length - 1));
+                    ctx.fillStyle = col;
+                    ctx.fillText(density[charIndex], cx, cy);
+                }
             }
         }
     }
