@@ -115,7 +115,7 @@
     z-index: 5;
     --c: #7c7c82;                       /* grey resting colour */
     transform: scale(0.94);             /* slightly smaller at rest */
-    transition: transform 380ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition: transform 380ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 420ms ease;
     will-change: transform;
   }
   .feature.hot {
@@ -400,33 +400,67 @@
   }
   #brainDitherControls .bd-dump:hover { background: #2563eb; }
 
-  /* === Audio Visualiser overlay (particle wave) — MOUTH === */
-  #audioViz-overlay {
+  /* === MOUTH "speaking statue" — in-place audio-reactive scene =============
+     Clicking the mouth no longer dives into a 3D world. Instead the page copy
+     fades out, a letterbox window opens across the EYE region (the audio
+     visualiser plays through it), and the statue's MOUTH bobs in sync. The
+     ASCII statue render is untouched — the moving lips are copied from it. */
+
+  /* When .speaking is on the stage, all the page copy fades away. */
+  .stage.speaking .title-main,
+  .stage.speaking .hint,
+  .stage.speaking #feat-head,
+  .stage.speaking #feat-eye,
+  .stage.speaking #feat-mouth { opacity: 0; pointer-events: none; }
+  .stage.speaking .hover-zone { pointer-events: none; }
+  .title-main, .hint { transition: opacity 420ms ease; }
+
+  /* --- Eye-region window: framed viewport onto the visualiser.
+     Styled exactly like the main-page feature boxes (1px border + the square
+     corner dots). #eye-frame wraps the clipped window AND the dots so they
+     reveal together and the corners stay perfectly aligned. Size/ratio kept. */
+  #eye-frame {
     position: absolute;
-    inset: 0;
-    background: #000;
-    z-index: 30;
+    left: 457.02px;  top: 223.05px;
+    width: 507.19px; height: 137.08px;
+    z-index: 8;
     opacity: 0;
+    transform: scale(0.985);
+    transform-origin: center center;
     pointer-events: none;
-    transition: opacity 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition: opacity 420ms ease, transform 560ms cubic-bezier(0.2, 0.7, 0.2, 1);
   }
-  #audioViz-overlay.inside-audioViz {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  #audioVizCanvas {
+  .stage.speaking #eye-frame { opacity: 1; transform: scale(1); }
+  #eye-window {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
+    overflow: hidden;
+    background: rgba(217, 217, 217, 0.05);   /* same wash as .feature .box */
+    border: 1px solid #ffffff;               /* same as .feature.hot .box */
   }
-  /* Glassy control panel */
+  #audioVizCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* Inner vignette — fades the wave into the frame edges (from the Figma) */
+  #eye-frame .av-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 72% 116% at 50% 50%,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(12, 12, 12, 0.5) 58%,
+      rgba(1, 1, 3, 0.95) 100%);
+  }
+  /* Square corner dots — identical to the main-page .dot, centred on each corner. */
+  #eye-frame .ed { position: absolute; width: 7.18px; height: 7.18px; background: #ffffff; }
+  #eye-frame .ed.tl { left: -3.59px;  top: -3.59px; }
+  #eye-frame .ed.tr { right: -3.59px; top: -3.59px; }
+  #eye-frame .ed.bl { left: -3.59px;  bottom: -3.59px; }
+  #eye-frame .ed.br { right: -3.59px; bottom: -3.59px; }
+
+  /* --- Upload / playback panel (glassy; shown while speaking) --- */
   #audioVizPanel {
     position: absolute;
-    left: 28px;
-    bottom: 28px;
-    width: 300px;
+    left: 40px; bottom: 40px;
+    width: 280px;
     padding: 16px 18px 18px;
     background: rgba(16, 16, 18, 0.72);
     backdrop-filter: blur(18px) saturate(140%);
@@ -434,11 +468,16 @@
     border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-    z-index: 2;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition: opacity 420ms ease 240ms, transform 420ms ease 240ms;
     user-select: none;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: #f4f4f6;
   }
+  .stage.speaking #audioVizPanel { opacity: 1; pointer-events: auto; transform: translateY(0); }
   #audioVizPanel h1 { margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .3px; }
   #audioVizPanel .av-sub { margin: 0 0 14px; font-size: 11px; color: #8a8a92; }
   #audioVizPanel .av-drop {
@@ -457,16 +496,12 @@
   #audioVizPanel .av-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
   #audioVizPanel .av-track { font-size: 11.5px; color: #8a8a92; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #audioVizPanel button.av-play {
-    width: 40px;
-    height: 40px;
-    flex: none;
+    width: 40px; height: 40px; flex: none;
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.10);
-    background: #fff;
-    color: #000;
+    background: #fff; color: #000;
     cursor: pointer;
-    display: grid;
-    place-items: center;
+    display: grid; place-items: center;
     transition: transform .15s, opacity .2s;
   }
   #audioVizPanel button.av-play:hover { transform: scale(1.06); }
@@ -476,26 +511,51 @@
   #audioVizPanel .av-seek input { flex: 1; }
   #audioVizPanel .av-time { font-size: 10.5px; color: #8a8a92; font-variant-numeric: tabular-nums; min-width: 34px; }
   #audioVizPanel input[type=range] {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 3px;
-    border-radius: 3px;
+    -webkit-appearance: none; appearance: none;
+    height: 3px; border-radius: 3px;
     background: rgba(255, 255, 255, 0.18);
     cursor: pointer;
   }
   #audioVizPanel input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #fff;
-    border: none;
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; border: none;
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
   }
   #audioVizPanel .av-vol { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
   #audioVizPanel .av-vol svg { width: 14px; height: 14px; opacity: .6; flex: none; }
   #audioVizPanel .av-vol input { flex: 1; }
+
+  /* --- Moving mouth: black cavity + ASCII lips copied from the statue --- */
+  #mouth-black, #mouth-lips {
+    position: absolute;
+    left: 605.5px; top: 430.4px;
+    width: 131.9px; height: 113.4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 260ms ease 240ms;
+  }
+  #mouth-black { z-index: 6; display: block; }
+  #mouth-lips  { z-index: 7; transform: translateY(var(--mouth-drop, 0px)); will-change: transform; }
+  .stage.speaking #mouth-black,
+  .stage.speaking #mouth-lips { opacity: 1; }
+
+  /* --- "[ ESC ]" exit hint while speaking --- */
+  #speak-hint {
+    position: absolute;
+    left: 50%; bottom: 18px;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 420ms ease 220ms;
+  }
+  .stage.speaking #speak-hint { opacity: 1; }
 </style>
 </head>
 <body>
@@ -681,44 +741,61 @@
       </div>
     </div>
 
-    <!-- ===== Audio Visualiser scene (audio-reactive particle wave) — MOUTH ===== -->
-    <div id="audioViz-overlay">
-      <canvas id="audioVizCanvas"></canvas>
-      <div class="brain-vignette"></div>
+    <!-- ===== MOUTH speaking scene (in-place, no 3D dive) ===== -->
+    <!-- Dark cavity revealed when the lips drop (Mouth Shape Black, #010103). -->
+    <svg id="mouth-black" viewBox="0 0 131.797 114.605" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M20.4757 7.5579C33.4363 2.64358 32.678 5.44811 42.0487 4.49744C52.9506 3.39142 51.3717 1.22222 61.5572 0C75.4391 1.23792 90.3789 6.67808 102.891 12.0193C111.447 26.8223 127.911 58.1722 131.797 109.426C111.636 118.414 64.6959 112.973 64.6959 112.973C64.6959 112.973 23.1378 113.101 9.53963 90.7392C-0.733537 58.2255 -9.23413 33.8556 20.4757 7.5579Z" fill="#010103"/>
+    </svg>
+    <!-- ASCII lips: copied from #statueCanvas each frame, masked to the lip shape,
+         translated down by --mouth-drop (set from the audio level). -->
+    <canvas id="mouth-lips" aria-hidden="true"></canvas>
 
-      <div id="audioVizPanel">
-        <h1>Particle Wave</h1>
-        <p class="av-sub">Audio-reactive field</p>
+    <!-- Letterbox window across the eye region — the visualiser plays through it.
+         Framed + cornered like the main-page feature boxes; size/ratio preserved. -->
+    <div id="eye-frame" aria-hidden="true">
+      <div id="eye-window">
+        <canvas id="audioVizCanvas"></canvas>
+        <div class="av-vignette"></div>
+      </div>
+      <span class="ed tl"></span>
+      <span class="ed tr"></span>
+      <span class="ed bl"></span>
+      <span class="ed br"></span>
+    </div>
 
-        <div class="av-drop" id="av-drop">
-          <strong>Drop an audio file</strong> or click to browse<br>
-          <span style="font-size:10.5px;">mp3 · wav · ogg · m4a</span>
-        </div>
-        <input type="file" id="av-file" accept="audio/*" hidden>
+    <!-- Upload / playback controls (drop a track or play the bundled one). -->
+    <div id="audioVizPanel">
+      <h1>Particle Wave</h1>
+      <p class="av-sub">Audio-reactive field</p>
 
-        <div class="av-row">
-          <button class="av-play" id="av-play" disabled aria-label="Play">
-            <svg id="av-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <svg id="av-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-          </button>
-          <div class="av-track" id="av-track">No file loaded</div>
-        </div>
+      <div class="av-drop" id="av-drop">
+        <strong>Drop an audio file</strong> or click to browse<br>
+        <span style="font-size:10.5px;">mp3 · wav · ogg · m4a</span>
+      </div>
+      <input type="file" id="av-file" accept="audio/*" hidden>
 
-        <div class="av-seek">
-          <span class="av-time" id="av-cur">0:00</span>
-          <input type="range" id="av-seek" min="0" max="1000" value="0" disabled>
-          <span class="av-time" id="av-dur">0:00</span>
-        </div>
-
-        <div class="av-vol">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
-          <input type="range" id="av-vol" min="0" max="100" value="85">
-        </div>
+      <div class="av-row">
+        <button class="av-play" id="av-play" aria-label="Play">
+          <svg id="av-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="av-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+        <div class="av-track" id="av-track">voice.mp3</div>
       </div>
 
-      <audio id="av-audio" crossorigin="anonymous"></audio>
-      <div class="btn-close-brain" style="position: absolute; top: 30px; right: 40px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); cursor: pointer; border: 1px solid rgba(255,255,255,0.15); padding: 8px 16px; letter-spacing: 1px;">[ EXIT_VOICE ]</div>
+      <div class="av-seek">
+        <span class="av-time" id="av-cur">0:00</span>
+        <input type="range" id="av-seek" min="0" max="1000" value="0">
+        <span class="av-time" id="av-dur">0:00</span>
+      </div>
+
+      <div class="av-vol">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+        <input type="range" id="av-vol" min="0" max="100" value="85">
+      </div>
     </div>
+
+    <audio id="av-audio" src="assets/voice.mp3" crossorigin="anonymous" loop></audio>
+    <div id="speak-hint">[ ESC ] to return</div>
   </div>
 </div>
 
@@ -866,7 +943,7 @@
     const scene = new THREE.Scene();
     const VOID_BG = new THREE.Color(0x010103);   // opaque void backdrop (eye dive)
     scene.background = VOID_BG;
-    scene.fog = new THREE.Fog(0x010103, 1400, 5200);
+    scene.fog = new THREE.Fog(0x010103, 1500, 6800);   // depth fade (kept < star wrap period → repeat stays hidden)
 
     const camera = new THREE.PerspectiveCamera(FOV_HOME, W / H, 0.1, 10000);
     camera.position.set(0, 0, CAM_HOME_Z);
@@ -963,29 +1040,19 @@
       const sx = W / divX, sy = H / divY, sz = D / divZ;
       const pos = [], rnd = [], type = [], flow = [];
       const seed3 = () => [Math.random(), Math.random(), Math.random()];
-      // fixed per-cross-section seeds → reused on every depth layer (keeps it seamless)
-      const vertSeed = Array.from({ length: divX + 1 }, seed3);
-      const rungSeed = Array.from({ length: divY + 1 }, seed3);
       const pushLine = (ax, ay, az, bx, by, bz, t, s) => {
         pos.push(ax, ay, az, bx, by, bz);
         type.push(t, t);
         flow.push(0, 1);                            // 0 at start → 1 at end
         rnd.push(s[0], s[1], s[2], s[0], s[1], s[2]); // constant per line
       };
-      // Z-rails at every (x,y) node — span the full depth (continuous → seamless)
+      // ONLY Z-rails (depth lines) — X rungs & Y verticals removed by request.
+      // One rail at every (x,y) node, spanning the full depth (continuous → seamless).
       for (let i = 0; i <= divX; i++) {
         for (let j = 0; j <= divY; j++) {
           pushLine(-hx + sx * i, -hy + sy * j, -hz + cz,
                    -hx + sx * i, -hy + sy * j,  hz + cz, 1.0, seed3());
         }
-      }
-      // Full XY grid at every depth layer (rungs + verticals throughout the space)
-      for (let k = 0; k <= divZ; k++) {
-        const z = -hz + sz * k + cz;
-        for (let j = 0; j <= divY; j++)             // X rungs (horizontal)
-          pushLine(-hx, -hy + sy * j, z,  hx, -hy + sy * j, z, 0.0, rungSeed[j]);
-        for (let i = 0; i <= divX; i++)             // Y verticals
-          pushLine(-hx + sx * i, -hy, z,  -hx + sx * i, hy, z, 0.0, vertSeed[i]);
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,  3));
@@ -1041,16 +1108,20 @@
         float pulse  = 0.0;
         float blue   = 0.0;   // 1.0 = this sweep glows blue instead of white
         if (isRail) {
-          // Dashes flowing along the rail toward the camera. Driven by WORLD Z +
-          // time, repeating every cell → perfectly periodic, so the camera's
-          // per-cell wrap is invisible. Per-rail phase from aRnd.x.
-          float p  = vWorld.z / uCellZ - uTime * uSpeed + vRnd.x;
-          float f  = fract(p);
-          float dd = min(f, 1.0 - f);                  // 0 at the dash centre
-          float head = exp(-(dd * dd) / 0.0016);
-          float tail = exp(-(dd * dd) / 0.05) * 0.30;
-          pulse = clamp(head + tail, 0.0, 1.0);
-          // Per-rail colour roll: a fixed fraction of rails glow blue (the whole rail).
+          // LIGHT SWEEP along the depth rail — same comet treatment as the frame
+          // lines: a continuous base plus one bright head sweeping along the line.
+          // Phase/speed/direction come from the rail's own seed (no world-Z dashes,
+          // so no dotted look). Independent of camera Z → infinite wrap stays seamless.
+          float lh    = fract(sin(vRnd.y * 53.17 + vRnd.z * 19.31) * 43758.5453);
+          float dir   = fract(vRnd.z + lh) > 0.5 ? 1.0 : -1.0;
+          float speed = (0.5 + fract(vRnd.y + lh) * 1.1) * uSpeed * 1.6;
+          float head  = fract(uTime * speed * dir + vRnd.x + lh);
+          float d     = vFlow - head;
+          d           = d - floor(d + 0.5);            // shortest wrapped distance
+          float headG = exp(-(d * d) / 0.0016);        // tight bright core
+          float tail  = exp(-(d * d) / 0.05) * 0.32;   // soft halo
+          pulse = clamp(headG + tail, 0.0, 1.0);
+          // Per-rail blue roll (same white:blue ratio as before).
           float ch = fract(sin(vRnd.x * 127.1 + vRnd.y * 311.7 + vRnd.z * 74.7) * 43758.5453);
           blue = step(ch, uBluePortion);
         } else {
@@ -1129,13 +1200,113 @@
     gridFlow.uCZ.value     = COR_CZ;
     gridFlow.uPeriod.value = COR_PERIOD;
 
+    // ===================================================================
+    //  INFINITE STARFIELD  (replaces the old line grid — a deep-space void
+    //  the camera flies through). The star pattern is PERIODIC in Z by
+    //  gridPeriodZ — the exact distance the camera wraps by — so it loops
+    //  forever with no seam. Distant stars fade into the dark via fog.
+    // ===================================================================
+    //  ░ TUNING KNOBS ░
+    const STAR_PER_PERIOD = 20000;         // density: stars per depth period (more = denser)
+    const STAR_TILES      = [-2,-1,0,1,2]; // copies of the field tiled along the flight path
+    const STAR_HALF_W     = 6000;          // horizontal spread of the field
+    const STAR_HALF_H     = 3600;          // vertical spread of the field
+    const STAR_SIZE       = 3.4;           // master star-size multiplier
+
+    function buildStarfield() {
+      // Generate ONE period of stars, then replicate it across the tiles so the
+      // field is exactly periodic → seamless when the camera wraps.
+      const base = [];
+      for (let i = 0; i < STAR_PER_PERIOD; i++) {
+        const x  = (Math.random() * 2 - 1) * STAR_HALF_W;
+        const y  = (Math.random() * 2 - 1) * STAR_HALF_H;
+        const zf = Math.random();                       // 0..1 within one period
+        // Colour: mostly white / blue-white, a few warm — like the reference sky.
+        let r, g, b; const t = Math.random();
+        if      (t < 0.55) { r = 0.95; g = 0.97; b = 1.0; }   // white
+        else if (t < 0.85) { r = 0.60; g = 0.75; b = 1.0; }   // blue
+        else if (t < 0.95) { r = 0.80; g = 0.86; b = 1.0; }   // pale blue
+        else               { r = 1.00; g = 0.86; b = 0.70; }  // warm
+        // Mostly small stars, a few large bright ones.
+        const s     = (Math.random() < 0.92) ? (0.6 + Math.random() * 1.3)
+                                             : (2.2 + Math.random() * 2.2);
+        const phase = Math.random() * 6.2832;
+        base.push({ x, y, zf, r, g, b, s, phase });
+      }
+      const pos = [], col = [], siz = [], tw = [];
+      STAR_TILES.forEach((p) => {
+        base.forEach((st) => {
+          pos.push(st.x, st.y, CAM_INSIDE_Z + (st.zf + p) * gridPeriodZ);
+          col.push(st.r, st.g, st.b);
+          siz.push(st.s);
+          tw.push(st.phase);
+        });
+      });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('aColor',   new THREE.Float32BufferAttribute(col, 3));
+      geo.setAttribute('aSize',    new THREE.Float32BufferAttribute(siz, 1));
+      geo.setAttribute('aTwinkle', new THREE.Float32BufferAttribute(tw,  1));
+      return geo;
+    }
+
+    const STAR_VERT = `
+      #include <common>
+      #include <fog_pars_vertex>
+      attribute vec3  aColor;
+      attribute float aSize;
+      attribute float aTwinkle;
+      uniform float uTime;
+      uniform float uSize;
+      uniform float uPixelRatio;
+      varying vec3  vColor;
+      varying float vBright;
+      void main() {
+        vColor  = aColor;
+        vBright = 0.90 + 0.10 * sin(uTime * 1.5 + aTwinkle);   // gentle twinkle
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        float sz = aSize * uSize * uPixelRatio / max(-mvPosition.z, 1.0); // perspective size
+        gl_PointSize = clamp(sz, 1.0 * uPixelRatio, 16.0 * uPixelRatio);  // higher cap → near stars grow bigger
+        #include <fog_vertex>
+      }
+    `;
+    const STAR_FRAG = `
+      #include <common>
+      #include <fog_pars_fragment>
+      varying vec3  vColor;
+      varying float vBright;
+      void main() {
+        vec2 uv = gl_PointCoord - 0.5;
+        float d = length(uv);
+        if (d > 0.5) discard;
+        float disc = smoothstep(0.5, 0.0, d);          // soft round star
+        float core = smoothstep(0.30, 0.0, d);         // bright centre
+        gl_FragColor = vec4(vColor * vBright * (0.75 + 1.0 * core), disc);
+        #include <fog_fragment>
+      }
+    `;
+    const starMat = new THREE.ShaderMaterial({
+      uniforms: Object.assign(
+        THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+        {
+          uTime:       gridFlow.uTime,                 // shared clock (updated in the loop)
+          uSize:       { value: 500.0 * STAR_SIZE },
+          uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 1.75) },
+        }
+      ),
+      vertexShader: STAR_VERT,
+      fragmentShader: STAR_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,   // stars glow bright on the dark void
+      fog: true,
+    });
+
     // Captured so we can hide it during pass-through dives (mouth / head),
     // which must dive straight into their own scene without showing the void.
-    const gridMesh = new THREE.LineSegments(
-      buildLattice(COR_W, COR_H, COR_DEPTH, corDivX, corDivY, corDivZ, COR_CZ),
-      gridMaterial(0.16, 0.10)   // (frame-line opacity, rail base opacity)
-    );
-    gridMesh.renderOrder = -1;   // always draw the grid BEHIND the screens (no lines over screens)
+    const gridMesh = new THREE.Points(buildStarfield(), starMat);
+    gridMesh.renderOrder = -1;   // always draw the stars BEHIND the screens
     scene.add(gridMesh);
 
     // ---- FLOATING SCREENS (left & right walls, infinite loop) ----
@@ -1336,6 +1507,7 @@
     const SCROLL_PUSH     = 0.9;    // impulse per wheel-delta unit (sensitivity)
     const SCROLL_FRICTION = 0.93;   // glide decay (higher = longer coast)
     const SCROLL_MAXVEL   = 340;    // clamp top speed (units/frame)
+    const STAR_IDLE_DRIFT = 0.8;    // constant forward drift at rest (0 = stars hold still)
     let scrollZ   = CAM_INSIDE_Z;   // unwrapped scroll position
     let scrollVel = 0;              // current glide velocity
 
@@ -1521,7 +1693,8 @@
         // momentum glide → coast forward, friction eases to a stop
         scrollVel *= SCROLL_FRICTION;
         if (Math.abs(scrollVel) < 0.02) scrollVel = 0;
-        scrollZ += scrollVel;
+        // gentle constant drift forward → the starfield is always softly moving (like the ref)
+        scrollZ += scrollVel - STAR_IDLE_DRIFT;
         // wrap by the full sweep period so the lattice reads as infinite (no seam);
         // keeping scrollZ wrapped also keeps it numerically bounded forever.
         scrollZ = CAM_INSIDE_Z + ((((scrollZ - CAM_INSIDE_Z) % gridPeriodZ) + gridPeriodZ) % gridPeriodZ);
@@ -1950,16 +2123,31 @@
       return { open() {}, close() {}, isOpen: () => false };
     }
 
-    const overlay  = document.getElementById('audioViz-overlay');
     const canvas   = document.getElementById('audioVizCanvas');
-    const closeBtn = overlay.querySelector('.btn-close-brain');
 
-    const W = 1440, H = 750;
+    // Logical window box (CSS size of the eye-region viewport).
+    const W = 507, H = 137;
+    // The THREE wave is rendered into a large offscreen buffer (smooth source),
+    // then re-drawn as an ASCII glyph field onto the visible 2D canvas — exactly
+    // like BrainOS/dither: render 3D → read pixels → draw chars per cell.
+    const REND_W = 1440;
+    const REND_H = Math.round(REND_W * H / W);   // THREE buffer (keeps box ratio)
+    const DISP_W = W * 2, DISP_H = H * 2;        // visible 2D canvas (2× the box)
+
+    // ASCII spectrum analyser (charset/feel from the statue + BrainOS).
+    const A_CHARSET = "Ñ@#W$9876543210?!abc;:+=-,._ ";
+    const A_TINT    = { r: 236, g: 240, b: 248 };  // near-white glyphs
+    const SP_CELL   = 13;        // glyph cell in the 2× display buffer (~6.5 CSS px)
+    const SP_GAIN   = 1.9;       // bar-height gain
+    const SP_USEFUL = 64;        // analyser bins mapped across the width (musical range)
+    const SP_BASE   = 0.16;      // faint resting horizon intensity
 
     let renderer, scene, camera, points, uniforms, audioTex;
+    let dctx, asciiBuf, asciiCtx;                // visible 2D ctx + offscreen sampler
     let clock, started = false, isOpen = false, raf = 0;
 
-    // Camera framing
+    // Camera framing — same values as the original full-screen wave (FOV is
+    // vertical, so crest heights match; the wider box just shows more sideways).
     const camTarget = new THREE.Vector3(0, -2, -55);
     const camBase   = new THREE.Vector3(0, 24, 176);
 
@@ -1973,12 +2161,15 @@
     const freqData   = new Uint8Array(FREQ_BINS);
     const freqSmooth = new Float32Array(FREQ_BINS);
 
-    // Audio nodes / state
+    // Audio nodes / state — a single bundled track (assets/voice.mp3) autoplays.
     const audioEl = document.getElementById('av-audio');
     let audioCtx, analyser, srcNode, gainNode, audioReady = false;
     let levelSmooth = 0, bassSmooth = 0;
 
-    // UI refs
+    // Exposed to the mouth animation: smoothed loudness drives the jaw drop.
+    const drive = { level: 0, bass: 0 };
+
+    // Panel UI refs (upload / play / seek / volume).
     const drop      = document.getElementById('av-drop');
     const fileInput = document.getElementById('av-file');
     const playBtn   = document.getElementById('av-play');
@@ -2088,65 +2279,10 @@
     `;
 
     function buildScene() {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(W, H, false);
-      renderer.setClearColor(0x000000, 1);
-
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 1200);
-      camera.position.copy(camBase);
-      camera.lookAt(camTarget);
-
-      const positions = new Float32Array(COUNT * 3);
-      const aGrid     = new Float32Array(COUNT * 2);
-      const aRand     = new Float32Array(COUNT);
-      let i3 = 0, i2 = 0, i1 = 0;
-      for (let z = 0; z < GRID_Z; z++) {
-        for (let x = 0; x < GRID_X; x++) {
-          const u = x / (GRID_X - 1);
-          const v = z / (GRID_Z - 1);
-          const jx = (Math.random() - 0.5) * (SPAN_X / GRID_X) * 0.9;
-          const jz = (Math.random() - 0.5) * (SPAN_Z / GRID_Z) * 0.9;
-          positions[i3 + 0] = (u - 0.5) * SPAN_X + jx;
-          positions[i3 + 1] = 0;
-          positions[i3 + 2] = (v - 0.5) * SPAN_Z + jz;
-          aGrid[i2 + 0] = u; aGrid[i2 + 1] = v;
-          aRand[i1] = Math.random();
-          i3 += 3; i2 += 2; i1 += 1;
-        }
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geo.setAttribute('aGrid', new THREE.BufferAttribute(aGrid, 2));
-      geo.setAttribute('aRand', new THREE.BufferAttribute(aRand, 1));
-
-      audioTex = new THREE.DataTexture(freqData, FREQ_BINS, 1, THREE.RedFormat, THREE.UnsignedByteType);
-      audioTex.magFilter = THREE.LinearFilter;
-      audioTex.minFilter = THREE.LinearFilter;
-      audioTex.needsUpdate = true;
-
-      uniforms = {
-        uTime:       { value: 0 },
-        uAudioTex:   { value: audioTex },
-        uLevel:      { value: 0 },
-        uBass:       { value: 0 },
-        uSpanZ:      { value: SPAN_Z },
-        uSpanX:      { value: SPAN_X },
-        uFocus:      { value: 95 },
-        uAperture:   { value: 0.015 },
-        uSize:       { value: 1.2 },
-        uPixelRatio: { value: renderer.getPixelRatio() },
-      };
-
-      const material = new THREE.ShaderMaterial({
-        uniforms, vertexShader, fragmentShader,
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      });
-      points = new THREE.Points(geo, material);
-      scene.add(points);
-
-      clock = new THREE.Clock();
+      // Pure 2D ASCII spectrum — no WebGL. The visible #audioVizCanvas is a 2D
+      // context we draw the mirrored frequency bars onto, at 2× the box.
+      dctx = canvas.getContext('2d');
+      canvas.width = DISP_W; canvas.height = DISP_H;
     }
 
     function initAudio() {
@@ -2156,6 +2292,8 @@
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 1024;
       analyser.smoothingTimeConstant = 0.20;
+      analyser.minDecibels = -78;          // widen sensitivity so quieter bands
+      analyser.maxDecibels = -22;          // still light up the spectrum bars
       gainNode = audioCtx.createGain();
       gainNode.gain.value = parseFloat(volEl.value) / 100;
       srcNode.connect(analyser);
@@ -2181,37 +2319,11 @@
         levelSmooth += (sum / FREQ_BINS - levelSmooth) * 0.78;
         bassSmooth  += (bass / 24 - bassSmooth) * 0.92;
       }
-      for (let i = 0; i < FREQ_BINS; i++) freqData[i] = Math.min(255, freqSmooth[i] * 255);
-      audioTex.needsUpdate = true;
-      uniforms.uLevel.value = levelSmooth;
-      uniforms.uBass.value  = bassSmooth;
+      drive.level = levelSmooth;     // feeds the mouth's jaw-drop mapping
+      drive.bass  = bassSmooth;      // freqSmooth[] feeds the spectrum bars
     }
 
-    // --- camera interaction (drag to look, scroll to zoom, idle drift) ---
-    let dragging = false, px = 0, py = 0;
-    let yaw = 0, pitch = 0, zoom = 0;
-    let yawT = 0, pitchT = 0, zoomT = 0;
-    // Entry fly-in: extra camera distance that eases to 0 (rest), so entering
-    // the section feels like flying in toward the wave.
-    const introCam = { z: 0 };
-
-    function wireInteraction() {
-      canvas.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; });
-      window.addEventListener('pointerup', () => { dragging = false; });
-      window.addEventListener('pointermove', e => {
-        if (!isOpen || !dragging) return;
-        yawT   += (e.clientX - px) * 0.0016;
-        pitchT += (e.clientY - py) * 0.0012;
-        pitchT = Math.max(-0.35, Math.min(0.5, pitchT));
-        px = e.clientX; py = e.clientY;
-      });
-      canvas.addEventListener('wheel', e => {
-        if (!isOpen) return;
-        e.preventDefault();
-        zoomT = Math.max(-2, Math.min(60, zoomT + e.deltaY * 0.03));
-      }, { passive: false });
-    }
-
+    // Wire the upload / play / seek / volume panel (bound once, on first open).
     function wireUI() {
       const fmt = (s) => {
         if (!isFinite(s)) return '0:00';
@@ -2222,9 +2334,10 @@
         if (!file) return;
         audioEl.src = URL.createObjectURL(file);
         trackEl.textContent = file.name;
-        playBtn.disabled = false;
-        seek.disabled = false;
         audioEl.load();
+        initAudio();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        const p = audioEl.play(); if (p && p.catch) p.catch(() => {});
       };
 
       drop.addEventListener('click', () => fileInput.click());
@@ -2247,11 +2360,11 @@
       audioEl.addEventListener('play',  () => { iconPlay.style.display = 'none'; iconPause.style.display = ''; });
       audioEl.addEventListener('pause', () => { iconPlay.style.display = ''; iconPause.style.display = 'none'; });
       audioEl.addEventListener('loadedmetadata', () => { durEl.textContent = fmt(audioEl.duration); });
+      if (audioEl.readyState >= 1) durEl.textContent = fmt(audioEl.duration);   // metadata may already be loaded
       audioEl.addEventListener('timeupdate', () => {
         if (!seek.matches(':active')) seek.value = (audioEl.currentTime / audioEl.duration) * 1000 || 0;
         curEl.textContent = fmt(audioEl.currentTime);
       });
-      audioEl.addEventListener('ended', () => { iconPlay.style.display = ''; iconPause.style.display = 'none'; });
 
       seek.addEventListener('input', () => {
         if (audioEl.duration) audioEl.currentTime = (seek.value / 1000) * audioEl.duration;
@@ -2260,65 +2373,180 @@
         if (gainNode) gainNode.gain.value = volEl.value / 100;
         audioEl.volume = volEl.value / 100;
       });
+
+      // Panel clicks must not bubble to the document "click-outside" exit handler.
+      document.getElementById('audioVizPanel')
+        .addEventListener('click', e => e.stopPropagation());
     }
 
     function animate() {
       raf = requestAnimationFrame(animate);
       if (!isOpen) return;
-
-      const t = clock.getElapsedTime();
-      uniforms.uTime.value = t;
       sampleAudio();
-
-      yaw   += (yawT - yaw) * 0.06;
-      pitch += (pitchT - pitch) * 0.06;
-      zoom  += (zoomT - zoom) * 0.06;
-
-      const driftX = Math.sin(t * 0.10) * 3.0;
-      const driftY = Math.cos(t * 0.13) * 1.0;
-      camera.position.x = camBase.x + driftX + Math.sin(yaw) * 24;
-      camera.position.y = camBase.y + driftY + pitch * 16;
-      camera.position.z = Math.max(172, camBase.z + zoom + introCam.z);
-      camera.lookAt(camTarget.x + Math.sin(yaw) * 10, camTarget.y + pitch * 6, camTarget.z);
-
-      renderer.render(scene, camera);
+      paintSpectrum();
     }
 
-    function open(fly) {
-      if (isOpen) return;
+    // Mirrored ASCII frequency spectrum (a real audio visualiser): one bar per
+    // column, height = that band's loudness, drawn up + down from the centre
+    // line with the statue/BrainOS glyph set. Quiet → a faint resting horizon.
+    const len = A_CHARSET.length;
+    function glyph(ctx, cx, cy, it) {
+      const ci = Math.floor((1 - it) * (len - 1));
+      ctx.fillStyle = `rgb(${A_TINT.r * it | 0}, ${A_TINT.g * it | 0}, ${A_TINT.b * it | 0})`;
+      ctx.fillText(A_CHARSET[ci], cx, cy);
+    }
+    function paintSpectrum() {
+      dctx.clearRect(0, 0, DISP_W, DISP_H);
+      dctx.fillStyle = '#010103';
+      dctx.fillRect(0, 0, DISP_W, DISP_H);
+      dctx.font = `bold ${SP_CELL}px monospace`;
+      dctx.textAlign = 'center';
+      dctx.textBaseline = 'middle';
+
+      const cols = Math.floor(DISP_W / SP_CELL);
+      const rows = Math.floor(DISP_H / SP_CELL);
+      const mid  = (rows - 1) / 2;
+      const half = Math.floor(rows / 2);
+      const STEP = 2;                       // bar + gap → distinct vertical bars
+      const nBars = Math.floor(cols / STEP);
+
+      for (let c = 0; c < cols; c += STEP) {
+        const fx  = nBars > 1 ? (c / STEP) / (nBars - 1) : 0;
+        // spread bins across the width; tilt boosts the (naturally quieter) highs
+        // so the spectrum fills the window instead of bunching on the left.
+        const bin  = Math.min(FREQ_BINS - 1, Math.floor(Math.pow(fx, 1.35) * SP_USEFUL));
+        const tilt = 0.75 + 1.7 * fx;
+        const v    = Math.min(1, freqSmooth[bin] * SP_GAIN * tilt);
+        const cx  = c * SP_CELL + SP_CELL / 2;
+
+        // resting horizon cell (always visible, brightens with the band)
+        glyph(dctx, cx, mid * SP_CELL + SP_CELL / 2, Math.max(SP_BASE, v));
+
+        const bars = Math.round(v * half);
+        for (let k = 1; k <= bars; k++) {
+          const it = Math.max(0.05, v * (1 - (k / (half + 1)) * 0.5));   // tip fades a touch
+          glyph(dctx, cx, (mid - k) * SP_CELL + SP_CELL / 2, it);        // up
+          glyph(dctx, cx, (mid + k) * SP_CELL + SP_CELL / 2, it);        // down
+        }
+      }
+    }
+
+    function open() {
       if (!started) {
-        buildScene(); wireUI(); wireInteraction(); started = true;
-        // Pre-warm while the overlay is still invisible: compile the GLSL
-        // program and upload the 102k-point buffers to the GPU now, so this
-        // heavy one-time hitch doesn't land in the middle of the fade-in
-        // (the cause of the glitch when entering the mouth section).
-        renderer.compile(scene, camera);
-        renderer.render(scene, camera);
+        buildScene(); wireUI(); started = true;
         raf = requestAnimationFrame(animate);
       }
       isOpen = true;
-      if (fly) {
-        // Rush the camera in from far away to its resting distance — same
-        // duration + ease as the eye scene's dive, so they feel identical.
-        introCam.z = 720;
-        gsap.to(introCam, { z: 0, duration: 2.6, ease: 'power4.inOut' });
-      }
-      // Defer the fade by a frame so the pre-warm work is fully flushed
-      // before the opacity transition begins.
-      requestAnimationFrame(() => overlay.classList.add('inside-audioViz'));
+      // The mouth click is the user gesture that unlocks audio. Start the
+      // bundled track; a missing/blocked file fails silently → the wave idles.
+      initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      try { audioEl.currentTime = 0; } catch (e) {}
+      const p = audioEl.play();
+      if (p && p.catch) p.catch(() => {});
     }
     function close() {
       if (!isOpen) return;
       isOpen = false;
-      overlay.classList.remove('inside-audioViz');
       if (!audioEl.paused) audioEl.pause();
     }
 
-    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) close(); });
-
-    return { open, close, isOpen: () => isOpen };
+    return { open, close, isOpen: () => isOpen, drive };
   })();
+
+  // === MOUTH "speaking statue" — in-place mouth animation + window reveal ===
+  // No 3D dive: fade the page copy, open the eye-region window onto the
+  // visualiser, and bob the statue's lips in time with the audio. The lips are
+  // copied straight from #statueCanvas, so they stay pure ASCII.
+  const speak = (function () {
+    const stage   = document.getElementById('stage');
+    const statueC = document.getElementById('statueCanvas');
+    const lips    = document.getElementById('mouth-lips');
+    const black   = document.getElementById('mouth-black');
+    if (!stage || !statueC || !lips) return { enter() {}, exit() {}, isOn: () => false };
+    const lctx = lips.getContext('2d');
+
+    // Lip silhouette (Figma "Mouth Shape", viewBox 131.797 × 114.605).
+    const LIP_VB   = { w: 131.797, h: 114.605 };
+    const LIP_PATH = new Path2D('M20.4757 7.5579C33.4363 2.64358 32.678 5.44811 42.0487 4.49744C52.9506 3.39142 51.3717 1.22222 61.5572 0C75.4391 1.23792 90.3789 6.67808 102.891 12.0193C111.447 26.8223 127.911 58.1722 131.797 109.426C111.636 118.414 64.6959 112.973 64.6959 112.973C64.6959 112.973 23.1378 113.101 9.53963 90.7392C-0.733537 58.2255 -9.23413 33.8556 20.4757 7.5579Z');
+
+    // Geometry (stage 1440×750 space). STATUE matches the .statue CSS box;
+    // MOUTH is the lip bbox — tweak here to nudge alignment onto the ASCII mouth.
+    const STATUE = { left: 329, top: -10, w: 782, h: 838 };
+    const MOUTH  = { left: 605.5, top: 430.4, w: 131.9, h: 113.4 };
+    const DPR = 2;
+
+    // Place the lips + black layers from the single MOUTH source of truth.
+    [lips, black].forEach(el => {
+      el.style.left   = MOUTH.left + 'px';
+      el.style.top    = MOUTH.top  + 'px';
+      el.style.width  = MOUTH.w + 'px';
+      el.style.height = MOUTH.h + 'px';
+    });
+    lips.width  = Math.round(MOUTH.w * DPR);
+    lips.height = Math.round(MOUTH.h * DPR);
+
+    const MAX_DROP = 46;          // px the jaw can drop at full volume
+    let drop = 0, on = false, raf = 0;
+
+    function srcRect() {
+      const kx = statueC.width  / STATUE.w;
+      const ky = statueC.height / STATUE.h;
+      return {
+        x: (MOUTH.left - STATUE.left) * kx,
+        y: (MOUTH.top  - STATUE.top ) * ky,
+        w: MOUTH.w * kx,
+        h: MOUTH.h * ky,
+      };
+    }
+
+    function render() {
+      raf = requestAnimationFrame(render);
+      if (!on) return;
+
+      // Ease the jaw drop toward the current audio loudness. Amplified + a mild
+      // power curve so the mouth clearly opens and closes (not a faint twitch).
+      const d = audioViz.drive || { level: 0, bass: 0 };
+      const lvl = Math.min(1, d.bass * 3.0 + d.level * 2.0);
+      const target = Math.pow(lvl, 0.8) * MAX_DROP;
+      drop += (target - drop) * 0.45;
+      lips.style.setProperty('--mouth-drop', drop.toFixed(2) + 'px');
+
+      // Copy the statue's mouth region, then mask it to the lip silhouette.
+      const s = srcRect();
+      lctx.clearRect(0, 0, lips.width, lips.height);
+      lctx.drawImage(statueC, s.x, s.y, s.w, s.h, 0, 0, lips.width, lips.height);
+      lctx.save();
+      lctx.globalCompositeOperation = 'destination-in';
+      lctx.setTransform(lips.width / LIP_VB.w, 0, 0, lips.height / LIP_VB.h, 0, 0);
+      lctx.fillStyle = '#000';
+      lctx.fill(LIP_PATH);
+      lctx.restore();
+    }
+    requestAnimationFrame(render);
+
+    function enter() {
+      if (on) return;
+      on = true;
+      stage.classList.add('speaking');
+      audioViz.open();        // synchronous → preserves the click's audio gesture
+    }
+    function exit() {
+      if (!on) return;
+      on = false;
+      stage.classList.remove('speaking');
+      audioViz.close();
+      drop = 0;
+      lips.style.setProperty('--mouth-drop', '0px');
+    }
+    return { enter, exit, isOn: () => on };
+  })();
+
+  // Leave speaking mode: Esc, or a click anywhere outside the eye window.
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && speak.isOn()) speak.exit(); });
+  document.addEventListener('click', (e) => {
+    if (speak.isOn() && !(e.target.closest && e.target.closest('#eye-frame, #audioVizPanel'))) speak.exit();
+  });
 
   // === Hover interactions ===
   // The label groups are ALWAYS on screen (grey, slightly shrunk). Hovering a box
@@ -2329,11 +2557,11 @@
     zone.addEventListener('mouseleave', () => feat.classList.remove('hot'));
     zone.addEventListener('click', (e) => {
       e.stopPropagation();
-      // All three use the SAME shatter+dive entrance; EYE lands in the void,
-      // HEAD lands in the ASCII brain, MOUTH lands in the audio particle wave.
+      // EYE + HEAD keep the shatter+dive entrance (void / ASCII brain). MOUTH
+      // stays in place: fade the copy, open the eye window, animate the lips.
       if (zone.dataset.target === 'eye')   { brain.open();                                       return; }
       if (zone.dataset.target === 'head')  { brain.open({ reveal: () => brainAscii.open(true) }); return; }
-      if (zone.dataset.target === 'mouth') { brain.open({ reveal: () => audioViz.open(true) });   return; }
+      if (zone.dataset.target === 'mouth') { speak.enter();                                       return; }
     });
   });
 
@@ -2343,7 +2571,7 @@
   const headBox = document.querySelector('#feat-head .box');
   if (headBox) headBox.addEventListener('click', (e) => { e.stopPropagation(); brain.open({ reveal: () => brainAscii.open(true) }); });
   const mouthBox = document.querySelector('#feat-mouth .box');
-  if (mouthBox) mouthBox.addEventListener('click', (e) => { e.stopPropagation(); brain.open({ reveal: () => audioViz.open(true) }); });
+  if (mouthBox) mouthBox.addEventListener('click', (e) => { e.stopPropagation(); speak.enter(); });
 
   // Warm up the brain model in the background so its fly-in is ready on entry.
   const preloadBrain = () => { try { brainAscii.preload(); } catch (e) {} };

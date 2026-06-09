@@ -7,9 +7,9 @@
 <!--
   BrainOS. The ASCII brain core is pulled DIRECTLY from dither_brain.html
   (that file is left untouched): exact rendering, sizing, OrbitControls
-  click-drag, hover detection, hemisphere tone-inversion highlight, camera feel.
+  click-drag, camera feel.
 
-  Manifestations (folders / terminal / model card / podcast / thought bubbles)
+  Manifestations (folders / terminal / model card / podcast)
   are HTML elements anchored to fixed 3D points around the brain and re-projected
   to screen space every frame — so they are children of the brain: when you drag
   the brain (orbit the camera) every panel rotates, repositions, rescales and
@@ -38,24 +38,28 @@
   /* the reference control panel — kept (hidden) so the ported brain script runs verbatim */
   #controls{ display:none; }
 
-  /* faint focus glow under the brain — the only "environment" element */
-  #canvas-container{
-    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  /* One shared stacking context for the brain + panels, so a panel can sit IN FRONT OF
+     (near side) or BEHIND (far side) the opaque brain canvas. */
+  #scene{
+    position:fixed; inset:0;
     background:
-      radial-gradient(closest-side at 50% 50%, rgba(20,26,44,.55), rgba(0,0,0,0) 70%),
+      radial-gradient(closest-side at 50% 50%, rgba(20,26,44,.45), rgba(0,0,0,0) 70%),
       #000;
   }
   #displayCanvas{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    z-index:10;                           /* brain sits between near panels (20) and far panels (5) */
     image-rendering:pixelated;
     max-width:95%; max-height:95%;        /* EXACT sizing from dither_brain.html (intrinsic 1440×750) */
     cursor:grab; touch-action:none;
   }
   #displayCanvas:active{ cursor:grabbing; }
 
-  /* ── anchored manifestations layer (projected onto the brain each frame) ── */
-  #panels{ position:fixed; inset:0; z-index:5; pointer-events:none; }
+  /* panel layer creates NO stacking context (no z-index) → each panel's z-index competes
+     directly with the brain canvas, so far-side panels can drop behind it. */
+  #panels{ position:absolute; inset:0; pointer-events:none; }
   .panel{ position:absolute; left:0; top:0; opacity:0; will-change:transform,left,top,opacity;
-          transform:translate(-50%,-50%); }
+          transform:translate(-50%,-50%); pointer-events:auto; }
 
   /* solid cards — fully opaque so the brain never shows through them */
   .card{
@@ -73,12 +77,12 @@
   .panel:hover .dot{ background:var(--green); box-shadow:0 0 8px var(--green); }
 
   /* terminal */
-  .term{ width:300px; }
-  .term .bar{ display:flex; align-items:center; gap:6px; padding:8px 12px; background:#0c0e12; border-bottom:1px solid var(--border);}
-  .term .tl{ width:11px;height:11px;border-radius:50%; }
+  .term{ width:212px; }
+  .term .bar{ display:flex; align-items:center; gap:5px; padding:6px 10px; background:#0c0e12; border-bottom:1px solid var(--border);}
+  .term .tl{ width:9px;height:9px;border-radius:50%; }
   .term .tl.r{background:#ff5f56}.term .tl.y{background:#ffbd2e}.term .tl.g{background:#27c93f}
-  .term .bar .name{ margin-left:8px; font-size:11px; color:var(--muted); }
-  .term .scr{ height:176px; overflow:hidden; padding:10px 12px; font-size:12.5px; line-height:1.55;
+  .term .bar .name{ margin-left:6px; font-size:9.5px; color:var(--muted); }
+  .term .scr{ height:120px; overflow:hidden; padding:8px 10px; font-size:10px; line-height:1.5;
               color:var(--green); background:radial-gradient(120% 100% at 0 0,#0a0e0c,#070908); }
   .term .scr .ln{ white-space:pre-wrap; word-break:break-word; }
   .term .scr .ln.sys{ color:#5b7d6e; } .term .scr .ln.ok{ color:#9dffce; }
@@ -86,73 +90,75 @@
   @keyframes blink{50%{opacity:0}}
   .term-on .card{ box-shadow:0 0 0 1px rgba(61,255,163,.35), 0 0 50px rgba(61,255,163,.18), 0 26px 70px rgba(0,0,0,.6);}
 
-  /* folders */
-  .folder{ width:150px; text-align:center; cursor:pointer; user-select:none; }
-  .folder img{ width:128px; display:block; margin:0 auto; filter:drop-shadow(0 16px 30px rgba(0,0,0,.6)); transition:transform .5s var(--ease-spring); }
+  /* folders — glassy icons exported from Figma (label + glow baked in, transparent bg) */
+  .folder{ width:152px; cursor:pointer; user-select:none; }
+  .folder img{ width:152px; display:block; filter:drop-shadow(0 14px 24px rgba(0,0,0,.4)); transition:transform .5s var(--ease-spring); }
   .folder:hover img{ transform:translateY(-6px) scale(1.05); }
-  .folder .lbl{ margin-top:2px; font-size:11px; color:var(--muted); letter-spacing:1px; }
 
-  /* model comparison */
-  .board{ width:228px; padding:14px; }
-  .board .rows{ margin-top:12px; position:relative; }
-  .board .row{ display:flex; align-items:center; gap:10px; padding:7px 9px; border-radius:9px;
-    background:#0e1016; border:1px solid var(--border); margin-bottom:6px;
-    transition:transform .55s var(--ease-spring), background .3s, border-color .3s; }
-  .board .row:last-child{margin-bottom:0;}
-  .board .row .rk{ font-size:11px; color:var(--muted); width:14px; }
-  .board .row .nm{ font-size:13px; font-weight:600; flex:1; }
-  .board .row .sc{ font-size:12px; color:var(--blue-soft); font-variant-numeric:tabular-nums; }
-  .board .row.lead{ border-color:var(--border-hot); background:#12151f; }
-  .board .row.lead .sc{ color:var(--green); }
+  /* shared macOS-window chrome for the Figma panels */
+  .win{ border:1px solid #5c5c5c; border-radius:14px; overflow:hidden;
+        background:linear-gradient(180deg,#101010 80%, #4a4a4a 220%); }
+  .win .tbar{ height:22px; background:#292828; display:flex; align-items:center; gap:5px; padding:0 10px; }
+  .win .tbar i{ width:7px; height:7px; border-radius:50%; background:#565656; }
+  .win .hd{ display:flex; align-items:center; gap:7px; padding:11px 14px 7px; }
+  .win .hd .gdot{ width:7px; height:7px; border-radius:50%; background:#00be6f; box-shadow:0 0 6px #00be6f; flex:none; }
+  .win .hd .t{ font-size:16px; font-weight:600; letter-spacing:-0.4px; color:#fff; }
+  .panel:hover .win{ border-color:#7d7d7d; box-shadow:0 0 0 1px rgba(0,190,111,.22), 0 0 34px rgba(0,190,111,.12), 0 22px 60px rgba(0,0,0,.6); }
 
-  /* podcast */
-  .pod{ width:248px; padding:14px; }
-  .pod .ep{ display:flex; align-items:center; gap:12px; margin-top:10px; }
-  .pod .cover{ width:50px;height:50px;border-radius:11px; flex:none;
-    background:conic-gradient(from 0deg,#6b9bff,#b58bff,#3dffa3,#6b9bff);
-    display:flex;align-items:center;justify-content:center; font-size:20px;}
-  .pod .meta .h{ font-size:13px; font-weight:700; }
-  .pod .meta .s{ font-size:11px; color:var(--muted); }
-  .pod .wave{ display:flex; align-items:flex-end; gap:2px; height:34px; margin-top:12px; }
-  .pod .wave i{ flex:1; background:linear-gradient(180deg,var(--blue),#9b7bff); border-radius:2px; height:20%; transform-origin:bottom; }
-  .pod .ctrl{ display:flex; align-items:center; gap:10px; margin-top:10px; }
-  .pod .play{ width:34px;height:34px;border-radius:50%; border:none; cursor:pointer;
-    background:var(--text); color:#000; font-size:13px; display:flex;align-items:center;justify-content:center;}
-  .pod .snip{ font-size:11px; color:var(--blue-soft); min-height:14px; transition:opacity .3s; }
+  /* AI Leaderboard */
+  .board{ width:236px; }
+  .board .rows{ padding:2px 12px 13px; display:flex; flex-direction:column; gap:6px; position:relative; }
+  .board .row{ display:flex; align-items:center; gap:8px; background:#1b1b1b; border-radius:8px; padding:5px;
+    transition:transform .55s var(--ease-spring); }
+  .board .row .rk{ width:26px; height:26px; flex:none; background:#313131; border-radius:6px;
+    display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:300; }
+  .board .row .nm{ flex:1; font-size:14px; color:#fff; font-weight:300; letter-spacing:-0.3px; }
+  .board .row .sc{ font-size:14px; color:#00be6f; font-weight:600; padding-right:7px; font-variant-numeric:tabular-nums; }
 
-  /* compact "thought readout" panels (GPU / API / Gallery) — deliberately small + quiet */
-  .mini{ width:170px; padding:12px; }
-  .kv{ display:flex; justify-content:space-between; font-size:11.5px; margin:5px 0; }
-  .kv .k{ color:var(--muted); } .kv .v{ color:var(--green); font-variant-numeric:tabular-nums; }
-  .kv .v.blue{ color:var(--blue-soft); }
-  .gpu .big{ font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
-  .gpu canvas{ width:100%; height:50px; display:block; margin-top:8px; border-radius:6px; background:rgba(8,12,10,.5); }
-  .gallery{ width:176px; padding:12px; }
-  .frames{ display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:9px; }
-  .frames .fr{ aspect-ratio:1; border-radius:8px; border:1px solid rgba(255,255,255,.06); overflow:hidden; }
-  .frames .fr div{ width:100%;height:100%; background-size:200% 200%; animation:artshift 9s linear infinite; }
-  .gallery.on .frames .fr div{ animation-duration:2.2s; }
-  @keyframes artshift{0%{background-position:0 0;filter:hue-rotate(0)}100%{background-position:200% 200%;filter:hue-rotate(360deg)}}
+  /* GPU Monitor */
+  .gpu{ width:236px; }
+  .gpu .body{ padding:0 14px 13px; }
+  .gpu .row{ display:flex; align-items:flex-end; justify-content:space-between; }
+  .gpu .row .lbl{ font-size:14px; color:#fff; font-weight:300; }
+  .gpu .row .big{ font-size:32px; color:#00be6f; font-weight:600; line-height:.9; font-variant-numeric:tabular-nums; }
+  .gpu canvas{ width:100%; height:62px; display:block; margin-top:8px; border-radius:6px; }
 
-  /* idea cards / book pages (transient anchored bits) */
-  .idea{ background:linear-gradient(180deg,#12141c,#0c0d12); border:1px solid var(--border-hot);
-    color:var(--text); font-size:12px; font-weight:600; padding:9px 13px; border-radius:10px;
-    white-space:nowrap; box-shadow:0 16px 40px rgba(0,0,0,.6), 0 0 22px rgba(107,155,255,.18); }
-  .idea .ic{ color:var(--blue); margin-right:6px; }
-  .page{ width:150px; background:#f3f3f0; color:#1b1b1b; border-radius:6px; padding:10px 12px;
-    font-size:11px; line-height:1.4; box-shadow:0 14px 32px rgba(0,0,0,.6); }
-  .page b{ color:#6b3bff; }
+  /* Podcast */
+  .pod{ width:288px; }
+  .pod .body{ padding:11px 13px 13px; }
+  .pod .np{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#fff; }
+  .pod .np .gdot{ width:6px;height:6px;border-radius:50%; background:#00be6f; box-shadow:0 0 6px #00be6f; }
+  .pod .grid{ display:flex; gap:12px; margin-top:11px; }
+  .pod .cover{ width:104px; height:104px; flex:none; border-radius:9px; background:#305eff; position:relative;
+    padding:9px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; }
+  .pod .cover .ct{ font-size:9.5px; line-height:1.08; color:#fff; font-weight:600; }
+  .pod .cover .ca{ font-size:14px; color:#fff; font-weight:800; letter-spacing:-0.3px; }
+  .pod .cover .arc{ position:absolute; right:-46px; bottom:-46px; width:128px; height:128px; border-radius:50%; border:1px solid rgba(255,255,255,.35); }
+  .pod .cover .play{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,.9); color:#000;
+    display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; }
+  .pod .right{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .pod .right .h{ font-size:16px; font-weight:800; line-height:1.0; letter-spacing:-0.4px; color:#fff; }
+  .pod .right .a{ font-size:11px; color:#c8c8c8; margin-top:5px; }
+  .pod .wave{ display:flex; align-items:center; gap:2px; height:26px; margin-top:auto; }
+  .pod .wave i{ width:3px; background:#d9d9d9; border-radius:2px; height:18%; }
+  .pod .snip{ font-size:10px; color:#c8c8c8; margin-top:6px; font-style:italic; transition:opacity .3s; }
 
-  /* thought bubbles — the textbox aesthetic */
-  .bubble{ max-width:260px; font-weight:600; font-size:14px; line-height:1.25; color:#16161a;
-    padding:13px 20px; border-radius:30px;
-    background:linear-gradient(180deg,#f4f4f6,#dcdce1);
-    box-shadow:0 16px 36px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.7); }
-  .bubble.s2{ background:linear-gradient(180deg,#eef0f4,#cfd3db); }
-  .bubble::before,.bubble::after{ content:""; position:absolute; left:18px; border-radius:50%;
-    background:inherit; box-shadow:inset 0 1px 0 rgba(255,255,255,.6); }
-  .bubble::before{ width:13px;height:13px; bottom:-12px; }
-  .bubble::after{ width:7px;height:7px; bottom:-22px; left:12px; }
+
+  /* macOS "fan" files — children of the folder that rise UP out of it in an arc */
+  .fanfile{ position:absolute; left:50%; top:30px;      /* start at the folder's paper slot, inside it */
+    width:142px; min-height:80px;
+    background:linear-gradient(180deg,#ffffff,#e7e8ee); border:1px solid rgba(0,0,0,.10);
+    color:#17171b; font-size:11.5px; font-weight:600; line-height:1.3;
+    padding:26px 13px 13px; border-radius:9px; display:flex; align-items:flex-end;
+    box-shadow:0 16px 32px rgba(0,0,0,.5);
+    transform-origin:center bottom; pointer-events:none;
+    transform:translate(-50%,6px) scale(.3); opacity:0;
+    transition:transform .6s var(--ease-spring), opacity .4s ease; }
+  .fanfile.open{ opacity:1; }
+  .fanfile .ic{ position:absolute; top:9px; left:13px; font-size:14px; color:#5b8cff; }
+  .fanfile.page .ic{ color:#8a6bff; }
+
 
   /* minimal HUD */
   .hud{ position:fixed; z-index:40; font-size:11px; letter-spacing:.5px; opacity:.85; }
@@ -184,8 +190,8 @@
   <input type="range" id="contrast" value="2.3">
   <input type="range" id="threshold" value="1.7">
   <input type="range" id="shadowLift" value="28">
-  <input type="range" id="noise" value="47">
-  <input type="range" id="fps" value="36">
+  <input type="range" id="noise" value="7">
+  <input type="range" id="fps" value="60">
   <input type="range" id="rotY" value="0.42">
   <input type="range" id="rotX" value="0">
   <input type="range" id="rotZ" value="0">
@@ -197,11 +203,10 @@
   <input type="range" id="lightIntensity" value="6">
 </div>
 
-<div id="canvas-container">
+<div id="scene">
   <canvas id="displayCanvas"></canvas>
+  <div id="panels"></div>
 </div>
-
-<div id="panels"></div>
 
 <div id="brand" class="hud">
   <div class="b"><span class="ld"></span>BrainOS</div>
@@ -228,18 +233,27 @@
   /* ════════════════════════════════════════════════════════════════════
      BRAIN CORE — ported directly from dither_brain.html (unchanged behaviour)
      ════════════════════════════════════════════════════════════════════ */
-  const AUTO_ROTATE_SPEED  = 1.5;
+  const AUTO_ROTATE_SPEED  = 0.8;    // ← idle spin speed. Higher = faster. Set 0 to stop.
   const VERTICAL_LIMIT_DEG = 25;
   const DRAG_SENSITIVITY   = 1.0;
 
+  // ╔═══════════════════════════════════════════════════════════════════╗
+  // ║  BRAIN_ZOOM  —  this is the knob to make the brain BIGGER/SMALLER.  ║
+  // ║  Camera distance = baseDistance × BRAIN_ZOOM.                       ║
+  // ║  LOWER  = zoom IN  = bigger brain  (don't go below ~0.80 or the     ║
+  // ║           brain starts to clip top/bottom).                         ║
+  // ║  HIGHER = zoom OUT = smaller brain.                                 ║
+  // ╚═══════════════════════════════════════════════════════════════════╝
+  const BRAIN_ZOOM = 1.0;   // 1.0 = bounding sphere fits the framebuffer at EVERY rotation (no clipping)
+
   const DEBUG_REGIONS = false;
   const REGION = { splitAxis: 'x', splitSign: 1, splitAt: 0.5 };
-  const HIGHLIGHT = { fadeSpeed: 9.0, tintBlend: 0.0 };
+  const HIGHLIGHT = { tintBlend: 0.0 };
   const REGION_DEBUG_COLORS = ['#ff5555', '#5599ff'];
   const REGION_LEFT = 0, REGION_RIGHT = 1;
 
   const displayCanvas = document.getElementById('displayCanvas');
-  const ctx = displayCanvas.getContext('2d', { alpha: false });
+  const ctx = displayCanvas.getContext('2d', { alpha: true });
   const statusEl = document.getElementById('status');
   function setStatus(msg, kind = '') { statusEl.innerHTML = msg; statusEl.className = kind; }
 
@@ -251,8 +265,6 @@
 
   const offscreenCanvas = document.createElement('canvas');
   const offCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
-  const maskCanvas = document.createElement('canvas');
-  const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
 
   const charSets = {
     ascii:   "Ñ@#W$9876543210?!abc;:+=-,._ ",
@@ -297,39 +309,16 @@
   controls.enablePan = false; controls.enableZoom = false;
   controls.enableDamping = true; controls.dampingFactor = 0.045;
   controls.rotateSpeed = DRAG_SENSITIVITY * 0.7;
-  // Auto-rotate OFF so the attached panels rest in a stable, non-overlapping
-  // composition on the brain's face. Drag still orbits the brain + panels together.
-  controls.autoRotate = false; controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
+  // Auto-rotate ON — the brain idly spins and every attached panel orbits with it.
+  controls.autoRotate = true; controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
   const polarHalfRange = THREE.MathUtils.degToRad(VERTICAL_LIMIT_DEG);
   controls.minPolarAngle = Math.PI / 2 - polarHalfRange;
   controls.maxPolarAngle = Math.PI / 2 + polarHalfRange;
-
-  function setNdcFromEvent(e) {
-    const rect = displayCanvas.getBoundingClientRect();
-    ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
-    ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
-  }
-  displayCanvas.addEventListener('pointermove', (e) => {
-    pointerInside = true; if (e.buttons !== 0) return; setNdcFromEvent(e);
-  });
-  displayCanvas.addEventListener('pointerleave', () => { pointerInside = false; hoveredRegion = -1; });
-
-  function doPick() {
-    if (!isBrainLoaded || !brainMesh || !pointerInside) { hoveredRegion = -1; return; }
-    raycaster.setFromCamera(ndc, camera);
-    const hits = raycaster.intersectObject(brainMesh, false);
-    if (!hits.length || !hits[0].face) { hoveredRegion = -1; return; }
-    const ra = brainGeometry.getAttribute('region'); const f = hits[0].face;
-    const a = Math.round(ra.getX(f.a)), b = Math.round(ra.getX(f.b)), c = Math.round(ra.getX(f.c));
-    hoveredRegion = (a === c) ? a : (b === c ? b : a);
-  }
 
   let brainModel = null, baseDistance = 3, isBrainLoaded = false;
   let currentModelColor = inputs.modelColor.value;
   let brainMesh = null, brainGeometry = null, brainMaterial = null;
   let modelRadius = 1;                     // max dimension — used to scale panel anchors
-  const raycaster = new THREE.Raycaster(); const ndc = new THREE.Vector2();
-  let hoveredRegion = -1, pointerInside = false, highlightMix = 0, maskPixels = null;
 
   function classifyRegions(geometry) {
     geometry.computeBoundingBox();
@@ -352,14 +341,6 @@
     geometry.setAttribute('region', new THREE.BufferAttribute(region, 1));
     if (colors) geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   }
-
-  const maskMaterial = new THREE.ShaderMaterial({
-    uniforms: { uHoveredRegion: { value: -1.0 } },
-    vertexShader: `attribute float region; varying float vRegion;
-      void main(){ vRegion=region; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader: `varying float vRegion; uniform float uHoveredRegion;
-      void main(){ float isHot=step(abs(vRegion-uHoveredRegion),0.5); gl_FragColor=vec4(vec3(isHot),1.0); }`,
-  });
 
   const dracoLoader = new DRACOLoader();
   dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
@@ -384,7 +365,7 @@
     const fovRad = (camera.fov * Math.PI) / 180;
     baseDistance = (maxDim / (2 * Math.tan(fovRad / 2)));
     brainGroup.add(brainModel);
-    camera.position.set(0, 0, baseDistance * parseFloat(inputs.zoom.value));
+    camera.position.set(0, 0, baseDistance * BRAIN_ZOOM);
     controls.update();
     camera.updateMatrixWorld();
     keyLightOffset.copy(areaLight.position).applyMatrix4(camera.matrixWorld.clone().invert());
@@ -399,7 +380,6 @@
   const W = 1440, H = 750;
   displayCanvas.width = W; displayCanvas.height = H;
   offscreenCanvas.width = W; offscreenCanvas.height = H;
-  maskCanvas.width = W; maskCanvas.height = H;
   renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
 
   function hexToRgb(hex) {
@@ -417,9 +397,6 @@
       controls.update(dt);
       updateLightRig();
       updatePanels();                       // ← project the attached manifestations every frame
-      doPick();
-      const want = (hoveredRegion >= 0 && !DEBUG_REGIONS) ? 1 : 0;
-      highlightMix = THREE.MathUtils.damp(highlightMix, want, HIGHLIGHT.fadeSpeed, dt);
       renderer.render(scene, camera);
     }
 
@@ -430,13 +407,6 @@
     offCtx.clearRect(0, 0, W, H);
     if (isBrainLoaded) offCtx.drawImage(threeCanvas, 0, 0, W, H);
 
-    maskPixels = null;
-    if (isBrainLoaded && hoveredRegion >= 0 && highlightMix > 0.004) {
-      maskMaterial.uniforms.uHoveredRegion.value = hoveredRegion;
-      scene.overrideMaterial = maskMaterial; renderer.render(scene, camera); scene.overrideMaterial = null;
-      maskCtx.clearRect(0, 0, W, H); maskCtx.drawImage(threeCanvas, 0, 0, W, H);
-      maskPixels = maskCtx.getImageData(0, 0, W, H).data;
-    }
     drawDither();
   }
 
@@ -452,7 +422,10 @@
     const mode = inputs.charset.value === 'halftone' ? 'halftone' : 'ascii';
     const density = charSets[inputs.charset.value] || charSets.minimal;
 
-    ctx.fillStyle = "#000000"; ctx.fillRect(0, 0, W, H);
+    // Transparent canvas: paint ONLY the brain silhouette (opaque). Everything outside
+    // stays clear, so a panel sitting behind the brain (lower z-index) is occluded only
+    // by the brain SHAPE — it tucks partly behind the brain instead of vanishing.
+    ctx.clearRect(0, 0, W, H);
     ctx.font = `bold ${res}px monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (!isBrainLoaded) return;
 
@@ -462,6 +435,9 @@
         const index = (y * W + x) * 4;
         const r = pixels[index], g = pixels[index+1], b = pixels[index+2], a = pixels[index+3];
         if (a < 128) continue;
+        // fill this brain cell solid + opaque → builds a solid silhouette occluder;
+        // the dithered glyph is drawn on top of it below.
+        ctx.fillStyle = "#000"; ctx.fillRect(x, y, res, res);
         const srcLum = r * 0.299 + g * 0.587 + b * 0.114;
         let brightness = srcLum;
         brightness = ((brightness / 255 - 0.5) * contrast + 0.5) * 255;
@@ -470,9 +446,7 @@
         brightness = (brightness * thresh) + noise;
         brightness = Math.max(0, Math.min(255, brightness));
         if (brightness < 10) continue;
-        let bUse = brightness;
-        if (maskPixels && maskPixels[index] > 128) bUse = brightness + (255 - 2 * brightness) * highlightMix;
-        const lvl = Math.min(tones - 1, Math.floor((bUse / 255) * tones));
+        const lvl = Math.min(tones - 1, Math.floor((brightness / 255) * tones));
         const intensity = (lvl === tones - 1) ? highlight : (lvl + 1) / tones;
         let cr, cg, cb;
         const chroma = Math.max(r, g, b) - Math.min(r, g, b);
@@ -507,11 +481,11 @@
   const panelsLayer = document.getElementById('panels');
   const PANELS = [];                  // {el, anchor:Vector3, scale, opacity, hover}
   const _v = new THREE.Vector3();
-  const PANEL_SCALE = 0.82;           // keep the brain the hero (≈70/30) — panels are secondary
-  const IDLE_OPACITY = 0.7;           // quiet until you engage them; hover lifts to full
+  const PANEL_SCALE = 0.54;           // small → the brain stays the hero, panels fit on its flanks
+  const IDLE_OPACITY = 1.0;           // fully opaque — the brain never shows through a panel
 
-  function addAnchored(elm, anchorVec, scale = 1) {
-    const entry = { el: elm, anchor: anchorVec, scale, opacity: 0, hover: false };
+  function addAnchored(elm, anchorVec, scale = 1, opts = {}) {
+    const entry = { el: elm, anchor: anchorVec, scale, opacity: 0, hover: false, ...opts };
     elm.addEventListener('pointerenter', () => entry.hover = true);
     elm.addEventListener('pointerleave', () => entry.hover = false);
     PANELS.push(entry); return entry;
@@ -524,6 +498,24 @@
   // anchor authored in units of modelRadius (R). +x screen-right, +y up, +z toward camera.
   function A(x, y, z){ return new THREE.Vector3(x, y, z).multiplyScalar(modelRadius); }
 
+  // Pin to the ACTUAL brain mesh: shoot a ray from outside (along `dir`) toward the
+  // centre and take the first surface hit, so the panel sits on the real geometry
+  // (folds/bumps) in that direction — not on a smooth sphere. Falls back to a sphere
+  // point if the ray misses. The hit is in world space and the brain is world-fixed,
+  // so the panel stays welded to that exact point as the camera orbits.
+  const _surfRay = new THREE.Raycaster();
+  function surfaceAnchor(dir, lift = 0.05){
+    const d = dir.clone().normalize();
+    _surfRay.set(d.clone().multiplyScalar(modelRadius * 2.2), d.clone().negate());
+    const hits = brainMesh ? _surfRay.intersectObject(brainMesh, false) : [];
+    // The ray runs through the origin, so the hit lies on the `d` axis → its distance from
+    // centre is the surface radius in this direction. Clamp to a minimum so a panel never
+    // sinks into a recess/valley; it always rests on the brain's OUTER envelope like the rest.
+    let radius = hits.length ? hits[0].point.length() : modelRadius * 0.45;
+    radius = Math.max(radius, modelRadius * 0.42);
+    return d.multiplyScalar(radius + modelRadius * lift);
+  }
+
   function updatePanels() {
     if (!isBrainLoaded || !PANELS.length) return;
     const rect = displayCanvas.getBoundingClientRect();
@@ -534,71 +526,106 @@
       _v.project(camera);
       const sx = rect.left + (_v.x * 0.5 + 0.5) * rect.width;
       const sy = rect.top  + (-_v.y * 0.5 + 0.5) * rect.height;
-      // facing: is the anchor on the camera-facing side of the brain? 1 = front, -1 = back.
-      // Panels glide across the FRONT surface of the brain (overlapping it, as if stuck
-      // to it) and only fade out once they orbit around to the BACK.
+      // facing: 1 = anchor toward camera (front of the brain), -1 = away (behind it)
       const facing = p.anchor.clone().normalize().dot(camN);
-      const behind = THREE.MathUtils.clamp((facing + 0.35) / 0.30, 0, 1);     // fade over the back
-      const offEdge = Math.max(Math.abs(_v.x), Math.abs(_v.y));               // NDC distance from centre
-      const inView = THREE.MathUtils.clamp((1.45 - offEdge) / 0.25, 0, 1);    // safety: never fling off-frustum
-      const vis = behind * inView;
-      const targetOp = vis * (p.hover ? 1.0 : IDLE_OPACITY);                  // quiet until engaged
-      p.opacity += (targetOp - p.opacity) * 0.18;
-      const depthScale = THREE.MathUtils.clamp(baseDistance / dist, 0.8, 1.12);
+      const depthScale = THREE.MathUtils.clamp(baseDistance / dist, 0.85, 1.12);
       p.el.style.left = sx + 'px';
       p.el.style.top  = sy + 'px';
       p.el.style.transform = `translate(-50%,-50%) scale(${(depthScale * p.scale * PANEL_SCALE).toFixed(3)})`;
-      p.el.style.opacity = p.opacity.toFixed(3);
-      p.el.style.zIndex = String(20 + Math.round(facing * 12));
-      p.el.style.pointerEvents = (vis > 0.5) ? 'auto' : 'none';
+      // OCCLUSION, not fade: a far-side panel drops BEHIND the opaque brain canvas
+      // (z 5 < canvas 10) so the brain physically hides it; a near-side panel sits in
+      // front (z 20). The panel itself stays flat, 2D and fully opaque the whole orbit.
+      p.el.style.zIndex = facing >= 0 ? '20' : '5';
+      const offEdge = Math.max(Math.abs(_v.x), Math.abs(_v.y));
+      const onScreen = offEdge < 1.7 ? 1 : 0;          // frustum safety only — no orbit fade
+      if (!p.skipOpacity) {
+        p.opacity += (onScreen - p.opacity) * 0.3;
+        p.el.style.opacity = p.opacity.toFixed(3);
+      }
+      p.el.style.pointerEvents = (facing > 0.05 && onScreen) ? 'auto' : 'none';
+    }
+  }
+
+  // macOS "fan" view: clicking the folder makes its files rise UP out of it in a curved
+  // fan. The files are CHILDREN of the folder element, so they emerge from inside it and
+  // travel/scale/occlude together with the folder as the brain rotates.
+  function makeFan(folderEl, files, isPage) {
+    let open = false; const items = [];
+    folderEl.addEventListener('click', () => { open = !open; open ? openFan() : closeFan(); });
+    function openFan() {
+      files.forEach((txt, k) => {
+        const f = document.createElement('div');
+        f.className = 'fanfile' + (isPage ? ' page' : '');
+        f.innerHTML = `<span class="ic">${isPage ? '✎' : '▤'}</span>${txt}`;
+        folderEl.appendChild(f); items.push(f);
+        const ty = -(44 + k * 56);                 // each file higher than the last
+        const tx = Math.sin(k * 0.7) * 22;          // gentle horizontal arc → fan shape
+        const rot = Math.sin(k * 0.7) * 7;          // slight tilt per file
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          f.style.transitionDelay = (k * 45) + 'ms';   // pop out one after another
+          f.style.transform = `translate(-50%, ${ty}px) translateX(${tx}px) rotate(${rot}deg) scale(1)`;
+          f.classList.add('open');
+        }));
+      });
+    }
+    function closeFan() {
+      items.forEach((f, k) => {
+        f.style.transitionDelay = ((items.length - k) * 30) + 'ms';   // suck back in, top first
+        f.classList.remove('open');
+        f.style.transform = 'translate(-50%, 6px) scale(.3)';
+        setTimeout(() => f.remove(), 700 + items.length * 30);
+      });
+      items.length = 0;
     }
   }
 
   /* ── build the kept manifestations ──
-     LEFT  (logic / builder):  Learn → Compare → Optimize → Build
-        AI Ideas (upper-left) · AI Leaderboard (mid-left) · API Cost (upper-left REAR)
-        GPU Monitor (upper-left) · Terminal (lower-left)
-     RIGHT (creative / dreamer): Listen → Imagine → Create → Reflect
-        Podcast (upper-right) · AI Art Gallery (mid-right) · Prompt Book (lower-right)
-        Thought Bubbles (floating, right side) */
+     8 manifestations evenly spaced (45° apart) around the brain: Podcast · GPU Monitor ·
+     AI Leaderboard · Terminal · and 4 folders (2 on the right hemisphere, 2 on the left). */
   function setupPanels() {
-    // Anchors sit on the brain's surface rim — small |y| / |z| so they hug the brain
-    // and glide across its front face as it rotates, never flinging off the frustum.
-    // LEFT hemisphere
-    addAnchored(buildIdeas(),    A(-0.56,  0.20,  0.12), 0.96);   // upper-left
-    addAnchored(buildGpu(),      A(-0.66,  0.04,  0.02), 0.92);   // upper-left
-    addAnchored(buildModel(),    A(-0.58, -0.12,  0.14), 0.96);   // mid-left
-    addAnchored(buildApiCost(),  A(-0.42,  0.18, -0.34), 0.90);   // upper-left, REAR (discovered on rotate)
-    addAnchored(buildTerminal(), A(-0.56, -0.20,  0.10), 1.0);    // lower-left
-    // RIGHT hemisphere
-    addAnchored(buildPodcast(),  A( 0.56,  0.20,  0.12), 1.0);    // upper-right
-    addAnchored(buildGallery(),  A( 0.66, -0.04,  0.06), 0.94);   // mid-right
-    addAnchored(buildBook(),     A( 0.54, -0.18,  0.12), 1.0);    // lower-right
-    // ambient thought bubbles drift around the right side
-    startThoughtBubbles();
+    // Every panel is GLUED to a distinct region of the brain surface — distributed all
+    // the way around it (frontal, temporal, parietal, occipital …) on a ring. The brain
+    // is world-fixed and the camera orbits it, so each panel orbits WITH the brain:
+    // the ones on the face turned toward you are visible, and as it rotates they swing to
+    // the back and fade while others come round into view — exactly like thoughts stuck
+    // to different lobes. Azimuths are 45° apart with ALTERNATING heights, so the handful
+    // visible across the front are always staggered and never overlap each other.
+    // Spread over the sphere: an UPPER band and a LOWER band, alternating around the ring
+    // so neighbours are never at the same height (→ no overlap). Folders + data panels are
+    // mixed across both bands (2 folders up, 2 down; 2 folders right, 2 left). surfaceAnchor
+    // clamps recesses to the brain's outer envelope, so every panel sits on the EXTERIOR.
+    const UP = 0.27, DN = -0.22;
+    // make sure the mesh is in its resting tilt before we raycast surface points onto it
+    brainModel.rotation.set(parseFloat(inputs.tiltX.value), parseFloat(inputs.tiltY.value), parseFloat(inputs.tiltZ.value));
+    brainModel.updateMatrixWorld(true);
+    // phiDeg: 0 = front, 45..135 = RIGHT flank, 180 = back, 225..315 = LEFT flank.
+    // data panels are 25% bigger (scale 1.25); folders 50% bigger (scale 1.5)
+    const PANEL = 1.25, FOLDER = 1.5;
+    const place = (build, phiDeg, y, scale = PANEL) => {
+      const p = phiDeg * Math.PI / 180;
+      addAnchored(build, surfaceAnchor(new THREE.Vector3(Math.sin(p), y, Math.cos(p))), scale);
+    };
+    place(buildPodcast(),          0, UP);           // front — upper
+    place(buildSideHustle(),      45, DN, FOLDER);   // RIGHT — folder (lower)
+    place(buildClaudeMd(),        90, UP, FOLDER);   // RIGHT — folder (upper)
+    place(buildTerminal(),       180, UP, 1.55);      // back — upper (enlarged)
+    place(buildRandomThoughts(), 225, DN, FOLDER);   // LEFT — folder (lower)
+    place(buildAiResources(),    270, UP, FOLDER);   // LEFT — folder (upper)
+    place(buildModel(),          315, DN);           // LEFT — leaderboard (lower)
   }
 
   function mk(cls, html){ const d=document.createElement('div'); d.className='panel '+cls; d.innerHTML=html; panelsLayer.appendChild(d); return d; }
 
-  /* ── AI IDEAS FOLDER → explodes into idea cards ── */
-  function buildIdeas() {
-    const d = mk('folder', `<img src="assets/aiIdeasFolder.png" alt="AI Ideas" draggable="false"/><div class="lbl">AI Ideas</div>`);
-    let open = false; let cards = [];
-    const list = ['Uber For AI Agents','AI Co-Founder Simulator','Prompt Marketplace','GitHub For Prompts','AI Product Generator','Autonomous Startup Builder'];
-    d.addEventListener('click', () => { open = !open; open ? explode() : collapse(); });
-    function explode() {
-      const base = ideasEntry().anchor;
-      list.forEach((txt, k) => {
-        const c = mk('idea', `<span class="ic">◇</span>${txt}`); c.style.transition = 'opacity .4s';
-        const spreadY = (k - (list.length - 1) / 2) * 0.07 * modelRadius;
-        const anchor = base.clone().add(new THREE.Vector3((-0.12 - k * 0.05) * modelRadius, spreadY, 0.06 * modelRadius));
-        cards.push(addAnchored(c, anchor, 0.9));
-      });
-    }
-    function collapse() { cards.forEach(removeAnchored); cards = []; }
-    let _self; const ideasEntry = () => (_self ||= PANELS.find(p => p.el === d));
+  /* ── FOLDERS (Figma glass icons) → files fan up out of the folder (macOS fan view) ── */
+  function folder(img, label, files, isPage) {
+    const d = mk('folder', `<img src="assets/${img}" alt="${label}" draggable="false"/>`);
+    makeFan(d, files, isPage);
     return d;
   }
+  const buildSideHustle    = () => folder('sideHustleFolder.png',     'Side Hustle Ideas',    ['AI Newsletter', 'Prompt Marketplace', 'Micro-SaaS app', 'Faceless YouTube'], false);
+  const buildClaudeMd      = () => folder('claudeMdFolder.png',       'Claude.MD',            ['coding-rules.md', 'tone-of-voice.md', 'agent-system.md', 'context-window.md'], true);
+  const buildRandomThoughts= () => folder('randomThoughtsFolder.png', 'Random Thoughts',      ['what if agents dream?', 'is taste the moat?', 'ship &gt; perfect', 'touch grass (maybe)'], false);
+  const buildAiResources   = () => folder('aiResourcesFolder.png',    'AI Content Resources', ['best-prompts.pdf', 'model cheat-sheet', 'eval datasets', 'fine-tune guide'], true);
 
   /* ── TERMINAL — real streaming logs, chaotic on hover ── */
   function buildTerminal() {
@@ -632,21 +659,24 @@
     return d;
   }
 
-  /* ── MODEL COMPARISON — rankings reshuffle on hover ── */
+  /* ── AI LEADERBOARD (Figma) — macOS window, ranked rows, rankings reshuffle on hover ── */
   function buildModel() {
-    const d = mk('board-wrap', `<div class="card board"><div class="title"><span class="dot"></span>AI Leaderboard</div><div class="rows"></div></div>`);
+    const d = mk('board-wrap', `<div class="win board">
+      <div class="tbar"><i></i><i></i><i></i></div>
+      <div class="hd"><span class="gdot"></span><span class="t">AI Leaderboard</span></div>
+      <div class="rows"></div></div>`);
     const rowsEl = d.querySelector('.rows');
-    let models=[{n:'Claude',s:94.2},{n:'GPT',s:92.7},{n:'Gemini',s:90.1},{n:'Grok',s:88.4},{n:'DeepSeek',s:86.9}];
+    let models=[{n:'Claude',s:94.2},{n:'Gemini',s:92.7},{n:'ChatGPT',s:90.1},{n:'Grok',s:88.4},{n:'DeepSeek',s:86.9}];
     const map=new Map();
-    models.forEach(m=>{ const row=document.createElement('div'); row.className='row';
-      row.innerHTML=`<span class="rk mono"></span><span class="nm">${m.n}</span><span class="sc mono"></span>`;
+    models.forEach((m,i)=>{ const row=document.createElement('div'); row.className='row';
+      row.innerHTML=`<span class="rk">#${i+1}</span><span class="nm">${m.n}</span><span class="sc"></span>`;
       rowsEl.appendChild(row); map.set(m.n,row); });
     function render(animate){
       const prev=new Map(); map.forEach((row,n)=>prev.set(n,row.getBoundingClientRect().top));
       models.sort((a,b)=>b.s-a.s);
       models.forEach((m,i)=>{ const row=map.get(m.n);
         row.querySelector('.rk').textContent='#'+(i+1); row.querySelector('.sc').textContent=m.s.toFixed(1);
-        row.classList.toggle('lead', i===0); rowsEl.appendChild(row); });
+        rowsEl.appendChild(row); });
       if (animate) map.forEach((row,n)=>{ const np=row.getBoundingClientRect().top, dd=prev.get(n)-np;
         if (dd){ row.style.transition='none'; row.style.transform=`translateY(${dd}px)`;
           requestAnimationFrame(()=>{ row.style.transition=''; row.style.transform=''; }); } });
@@ -658,105 +688,73 @@
     return d;
   }
 
-  /* ── SAM ALTMAN PODCAST ── */
+  /* ── PODCAST (Figma) — macOS window, blue cover + play, animated waveform ── */
   function buildPodcast() {
-    const d = mk('pod-wrap', `<div class="card pod"><div class="title"><span class="dot"></span>Now Playing</div>
-      <div class="ep"><div class="cover">🎙️</div><div class="meta"><div class="h">The Future of Everything</div><div class="s">Sam Altman · ep. ∞</div></div></div>
-      <div class="wave">${'<i></i>'.repeat(28)}</div>
-      <div class="ctrl"><button class="play">▶</button><div class="snip mono">"reasoning models will…"</div></div></div>`);
+    const d = mk('pod-wrap', `<div class="win pod">
+      <div class="tbar"><i></i><i></i><i></i></div>
+      <div class="body">
+        <div class="np"><span class="gdot"></span>Now Playing</div>
+        <div class="grid">
+          <div class="cover">
+            <div class="ct">The Future Of<br>Everything In AI</div>
+            <div class="arc"></div>
+            <button class="play">▶</button>
+            <div class="ca">Sam Altman</div>
+          </div>
+          <div class="right">
+            <div class="h">The Future Of Everything In AI</div>
+            <div class="a">Sam Altman</div>
+            <div class="wave">${'<i></i>'.repeat(34)}</div>
+            <div class="snip">“the future of AI is…”</div>
+          </div>
+        </div>
+      </div></div>`);
     const bars=[...d.querySelectorAll('.wave i')]; const snipEl=d.querySelector('.snip'); const play=d.querySelector('.play');
-    const snips=['"the future of AI is…"','"agents will replace…"','"reasoning models will…"','"compute is the new oil"','"AGI is closer than…"','"everyone becomes a founder"'];
-    let on=false, t=0;
+    const snips=['“the future of AI is…”','“agents will replace…”','“reasoning models will…”','“compute is the new oil”','“AGI is closer than…”'];
+    let on=false, t=0, beat=0;
+    const N=bars.length, level=new Array(N).fill(0.15);
+    const rate=bars.map(()=>0.05+Math.random()*0.15), phase=bars.map(()=>Math.random()*Math.PI*2);
+    const weight=bars.map((_,i)=>{ const f=Math.abs(i-(N-1)/2)/((N-1)/2); return 0.5+0.5*(1-f); }); // centre-tall
     play.addEventListener('click',()=>{ on=!on; play.textContent=on?'❚❚':'▶'; });
     d.addEventListener('pointerenter',()=>{ on=true; play.textContent='❚❚'; });
-    (function frame(){ requestAnimationFrame(frame); t+=0.08;
-      bars.forEach((b,i)=>{ b.style.height=(on?(20+Math.abs(Math.sin(t+i*0.5))*78):(15+Math.sin(i)*4))+'%'; }); })();
+    (function frame(){ requestAnimationFrame(frame); t+=1; beat*=0.85;
+      if(on && Math.random()<0.07) beat=0.6+Math.random()*0.5;
+      for(let i=0;i<N;i++){
+        const target = on ? Math.min(1, weight[i]*(0.15+0.5*(0.5+0.5*Math.sin(t*rate[i]+phase[i]))) + Math.random()*0.25 + beat*0.2)
+                          : 0.06+0.04*Math.random();
+        const cur=level[i]; level[i]= target>cur ? cur+(target-cur)*0.6 : cur+(target-cur)*0.16;
+        bars[i].style.height=(8+level[i]*92)+'%';
+      }
+    })();
     setInterval(()=>{ if(on){ snipEl.style.opacity=0; setTimeout(()=>{ snipEl.textContent=snips[(Math.random()*snips.length)|0]; snipEl.style.opacity=1; },300); } },2400);
     return d;
   }
 
-  /* ── PROMPT BOOK FOLDER → pages fan out ── */
-  function buildBook() {
-    const d = mk('folder', `<img src="assets/promptBookFolder.png" alt="Prompt Book" draggable="false"/><div class="lbl">Prompt Book</div>`);
-    let open=false; let pages=[];
-    const prompts=['"Create a startup run entirely by cats."','"Design a coffee shop on Mars, ADA-compliant."','"Invent a guitar teacher from the year 2050."','"Write a religion for sentient toasters."','"Pitch Shark Tank as Roman senators."'];
-    d.addEventListener('click',()=>{ open=!open; open?fan():close(); });
-    function fan(){
-      const base = bookEntry().anchor;
-      prompts.forEach((txt,k)=>{ const p=mk('page', `<b>prompt ${k+1}</b><br>${txt}`); p.style.transition='opacity .4s';
-        const spreadY=(k-(prompts.length-1)/2)*0.07*modelRadius;
-        const anchor=base.clone().add(new THREE.Vector3((0.12 + k*0.05)*modelRadius, spreadY, 0.06*modelRadius));
-        pages.push(addAnchored(p, anchor, 0.92)); });
-    }
-    function close(){ pages.forEach(removeAnchored); pages=[]; }
-    let _self; const bookEntry=()=>(_self ||= PANELS.find(p=>p.el===d));
-    return d;
-  }
-
-  /* ── GPU MONITOR — random spikes (Optimize) ── */
+  /* ── GPU MONITOR (Figma) — macOS window, big green usage + area chart ── */
   function buildGpu() {
-    const d = mk('gpu', `<div class="card mini gpu"><div class="title"><span class="dot"></span>GPU</div>
-      <div class="kv"><span class="k">util</span><span class="big v">62%</span></div>
-      <canvas width="320" height="100"></canvas></div>`);
-    const cv=d.querySelector('canvas'), g=cv.getContext('2d'), pct=d.querySelector('.big');
-    const N=56, data=new Array(N).fill(0.4);
+    const d = mk('gpu-wrap', `<div class="win gpu">
+      <div class="tbar"><i></i><i></i><i></i></div>
+      <div class="hd"><span class="gdot"></span><span class="t">GPU Monitor</span></div>
+      <div class="body">
+        <div class="row"><span class="lbl">usage</span><span class="big">94.2</span></div>
+        <canvas width="360" height="130"></canvas></div></div>`);
+    const cv=d.querySelector('canvas'), g=cv.getContext('2d'), big=d.querySelector('.big');
+    const N=64, data=new Array(N).fill(0.6);
     setInterval(()=>{
-      let v=data[N-1]+(Math.random()*0.38-0.18); if(Math.random()<0.18) v=0.7+Math.random()*0.29;
-      v=THREE.MathUtils.clamp(v,0.08,0.99); data.push(v); data.shift(); pct.textContent=Math.round(v*100)+'%';
+      let v=data[N-1]+(Math.random()*0.34-0.17); if(Math.random()<0.2) v=0.8+Math.random()*0.19;
+      v=THREE.MathUtils.clamp(v,0.45,0.99); data.push(v); data.shift(); big.textContent=(v*100).toFixed(1);
       g.clearRect(0,0,cv.width,cv.height);
-      const grad=g.createLinearGradient(0,0,0,cv.height); grad.addColorStop(0,'rgba(61,255,163,.5)'); grad.addColorStop(1,'rgba(61,255,163,0)');
+      const grad=g.createLinearGradient(0,0,0,cv.height); grad.addColorStop(0,'rgba(0,190,111,.55)'); grad.addColorStop(1,'rgba(0,190,111,0)');
       g.beginPath(); g.moveTo(0,cv.height);
       data.forEach((dv,i)=>{ g.lineTo(i/(N-1)*cv.width, cv.height-dv*cv.height); });
       g.lineTo(cv.width,cv.height); g.closePath(); g.fillStyle=grad; g.fill();
       g.beginPath(); data.forEach((dv,i)=>{ const x=i/(N-1)*cv.width,y=cv.height-dv*cv.height; i?g.lineTo(x,y):g.moveTo(x,y); });
-      g.strokeStyle='#3dffa3'; g.lineWidth=2; g.stroke();
+      g.strokeStyle='#3dff9e'; g.lineWidth=2.5; g.stroke();
     },150);
     return d;
   }
 
-  /* ── API COST DASHBOARD — ticking spend (Optimize) ── */
-  function buildApiCost() {
-    const d = mk('apicost', `<div class="card mini apicost"><div class="title"><span class="dot"></span>API Cost</div>
-      <div class="kv"><span class="k">input</span><span class="v blue i">0</span></div>
-      <div class="kv"><span class="k">output</span><span class="v blue o">0</span></div>
-      <div class="kv"><span class="k">spend</span><span class="v c">$0</span></div>
-      <div class="kv"><span class="k">cache saved</span><span class="v s">$0</span></div></div>`);
-    let inT=8420000, outT=1120000, cost=214.3, cache=89.4; const fmt=n=>n.toLocaleString('en-US');
-    setInterval(()=>{ inT+=(Math.random()*5100+900)|0; outT+=(Math.random()*1900+300)|0; cost+=Math.random()*0.4+0.02; cache+=Math.random()*0.24+0.01;
-      d.querySelector('.i').textContent=fmt(inT); d.querySelector('.o').textContent=fmt(outT);
-      d.querySelector('.c').textContent='$'+cost.toFixed(2); d.querySelector('.s').textContent='$'+cache.toFixed(2); },750);
-    return d;
-  }
 
-  /* ── AI ART GALLERY — generative frames morph on hover (Imagine) ── */
-  function buildGallery() {
-    const grads=['linear-gradient(45deg,#6b9bff,#b58bff,#3dffa3)','linear-gradient(135deg,#ff8bd0,#6b9bff,#fff7b0)',
-      'linear-gradient(225deg,#3dffa3,#6b9bff,#b58bff)','linear-gradient(315deg,#ffb86b,#ff6b9b,#6b9bff)'];
-    const d = mk('gallery', `<div class="card gallery"><div class="title"><span class="dot"></span>AI Art</div>
-      <div class="frames">${grads.map(gr=>`<div class="fr"><div style="background-image:${gr}"></div></div>`).join('')}</div></div>`);
-    const card=d.querySelector('.gallery');
-    d.addEventListener('pointerenter',()=>card.classList.add('on'));
-    d.addEventListener('pointerleave',()=>card.classList.remove('on'));
-    return d;
-  }
-
-  /* ── THOUGHT BUBBLES — drift in/out around the right side of the mind ── */
-  function startThoughtBubbles() {
-    const thoughts=['What if agents build agents?','Will software become conversation?','Should I start another side project?',
-      'What if prompts replace apps?','Is my codebase just context now?','What if the model is the product?',
-      'Ship it. Refactor it in prod.','Hey Siri, play Sam Altman’s latest podcast'];
-    const liveMax=2; let live=[];
-    function spawn(){
-      if (live.length>=liveMax) return;
-      const b=mk('bubble'+(Math.random()<0.5?' s2':''), thoughts[(Math.random()*thoughts.length)|0]);
-      b.style.transition='opacity 1s';
-      // drift around the RIGHT side of the mind, hugging the surface rim
-      const anchor=A(0.40+Math.random()*0.24, -0.04+Math.random()*0.26, 0.12+Math.random()*0.16);
-      const entry=addAnchored(b, anchor, 0.92); live.push(entry);
-      setTimeout(()=>{ removeAnchored(entry); live=live.filter(e=>e!==entry); }, 7000+Math.random()*3000);
-    }
-    setInterval(spawn, 3200); spawn();
-  }
 </script>
 </body>
 </html>
