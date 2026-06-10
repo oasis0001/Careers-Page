@@ -104,6 +104,27 @@
     filter:drop-shadow(0 14px 24px rgba(0,0,0,.4)); transition:transform .45s var(--ease-spring); }
   .folder > img:hover{ transform:translateY(-5px) scale(1.07); }   /* hover the folder → it scales up a bit */
 
+  /* GLASSMORPHISM (cosmetic — the 4 folders only): two panes clipped to each folder's
+     OWN silhouette via its PNG used as a CSS mask. Both are pointer-events:none and
+     injected once at setup (see addFolderGlass) — they never touch the click / fan logic.
+       .fglass  sits BEHIND the icon (z2) → backdrop-blurs the brain so it frosts through
+       .fsheen  sits IN FRONT  (z4)       → a soft diagonal light streak + rim, like glass */
+  .folder > .fglass, .folder > .fsheen{
+    position:absolute; inset:0; pointer-events:none;
+    -webkit-mask:var(--mask) center/contain no-repeat;
+            mask:var(--mask) center/contain no-repeat;
+    transition:transform .45s var(--ease-spring); }   /* track the icon's hover lift */
+  .folder > .fglass{ z-index:2;
+    -webkit-backdrop-filter:blur(6px) saturate(140%) brightness(1.2);
+            backdrop-filter:blur(6px) saturate(140%) brightness(1.2); }
+  .folder > .fsheen{ z-index:4;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.06) 24%,
+                      rgba(255,255,255,0) 44%, rgba(255,255,255,0) 100%),
+      radial-gradient(120% 90% at 26% 12%, rgba(255,255,255,.16), rgba(255,255,255,0) 55%); }
+  .folder > img:hover ~ .fglass, .folder > img:hover ~ .fsheen{
+    transform:translateY(-5px) scale(1.07); }
+
   /* shared macOS-window chrome for the Figma panels */
   .win{ border:1px solid #5c5c5c; border-radius:14px; overflow:hidden;
         background:linear-gradient(180deg,#101010 80%, #4a4a4a 220%); }
@@ -484,6 +505,41 @@
   #status code{ background:#1a1c24; color:#ffd97a; padding:2px 6px; border-radius:4px; font-size:12px; }
   #status.error{ border-color:#5a2b2b; color:#ff9a8a; }
   #status.ok{ display:none; }
+
+  /* ════════════════════════════════════════════════════════════════════
+     EASTER EGG — custom right-click menu → "Forbidden Vault" reveal
+     ════════════════════════════════════════════════════════════════════ */
+  /* custom context menu (Figma 2052:134) — replaces the native browser menu */
+  #ctxMenu{ position:fixed; z-index:9999; display:none; top:0; left:0; min-width:201.7px;
+    background:#201d1e; border:.5px solid #686868; border-radius:4px;
+    box-shadow:0 10px 30px rgba(0,0,0,.55); transform-origin:top left; }
+  #ctxMenu.open{ display:block; animation:ctxIn .14s var(--ease-spring) both; }
+  @keyframes ctxIn{ from{ opacity:0; transform:scale(.96) translateY(-4px); } }
+  .ctx-item{ display:flex; align-items:center; height:31.6px; padding:0 12.5px; border-radius:4px;
+    font-family:"Bitcount Single",var(--mono); font-size:13.6px; line-height:1; letter-spacing:-.136px;
+    color:#fff; white-space:nowrap; user-select:none; cursor:pointer; }
+  .ctx-item:hover{ background:#2e2a2b; }
+
+  /* chrome fades away for a fully immersive reveal while the vault is shown */
+  #brand,#hint,#mind,#folderLinks{ transition:opacity .5s var(--ease-soft); }
+  body.vault-mode #brand,
+  body.vault-mode #hint,
+  body.vault-mode #mind,
+  body.vault-mode #folderLinks{ opacity:0 !important; pointer-events:none; }
+
+  /* the hidden "Forbidden Vault" glass folder — composited from the Figma 2052:139 vector
+     exports (frosted white-gradient glass) over a soft blue glow. Everything is sized off the
+     --vw knob (folder width), so it scales as one piece. 152px = same width as the other folders. */
+  .panel.vault{ opacity:0; pointer-events:none; }
+  .vault-folder{ --vw:152px; position:relative; width:var(--vw); height:calc(var(--vw) * 0.753);
+    user-select:none; filter:drop-shadow(0 18px 40px rgba(0,0,0,.55)); }
+  .vault-folder .vf-glow{ position:absolute; left:9%; top:30%; width:76%; height:58%;
+    background:#0039ff; border-radius:calc(var(--vw) * 0.133); filter:blur(calc(var(--vw) * 0.073)); opacity:.92; }
+  .vault-folder .vf-tab{ position:absolute; left:0; top:0; width:46.25%; height:12.1%; display:block; }
+  .vault-folder .vf-body{ position:absolute; left:0; top:12.1%; width:100%; height:87.9%; display:block; }
+  .vault-folder .vf-title{ position:absolute; left:10.2%; top:44.9%; width:86%; z-index:2;
+    font-family:"Inter Tight",var(--sans); font-weight:400; line-height:.95; color:#fff; text-transform:capitalize;
+    font-size:calc(var(--vw) * 0.166); letter-spacing:calc(var(--vw) * -0.0033); }
 </style>
 </head>
 <body>
@@ -542,6 +598,11 @@
 
 <div id="status">Initializing consciousness…</div>
 
+<!-- EASTER EGG: custom right-click menu (replaces the native browser context menu) -->
+<div id="ctxMenu" role="menu" aria-hidden="true">
+  <div class="ctx-item" id="ctxShowVault" role="menuitem">Show hidden folder...</div>
+</div>
+
 <script type="importmap">
 { "imports": {
   "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -572,6 +633,37 @@
   const _spinHolds = new Set();
   function brainHold(by){ _spinHolds.add(by); spinTarget = 0; controls.enableRotate = false; }   // ease to a stop + lock rotation
   function brainRelease(by){ _spinHolds.delete(by); if (!_spinHolds.size){ spinTarget = AUTO_ROTATE_SPEED; controls.enableRotate = true; } }  // resume spin + unlock
+
+  // ── EASTER EGG: "FORBIDDEN VAULT" REVEAL ───────────────────────────
+  // Right-click → custom menu → fade out every panel + the HUD chrome, then spin the
+  // brain a half-turn to the BACK to reveal a hidden glass folder. Click away → reverse it.
+  let vaultState  = 'idle';     // 'idle' | 'entering' | 'shown' | 'exiting'
+  let vaultHidden = false;      // drives the per-frame fade of the 8 normal panels (see updatePanels)
+  let vaultReveal = false;      // drives the per-frame fade of the vault panel itself
+  let vaultEntry  = null;       // the anchored Forbidden Vault panel
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║  KNOB: at WHICH rotation the brain rests when the vault is revealed.  ║
+  // ║  Absolute camera azimuth (degrees). The reveal always lands here, and ║
+  // ║  the folder is pinned to this same spot so they stay aligned.         ║
+  // ║    0 = front · 90 = right side (default) · 180 = back · 270 = left.    ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+  const VAULT_VIEW_AZIMUTH_DEG = 120;
+  let vaultReturnAz = 0;        // azimuth to spin back to on dismiss
+  let vaultReturnPolar = Math.PI / 2;   // polar (vertical) angle to restore on dismiss
+  const normalizeAngle = (a) => { a %= Math.PI * 2; if (a > Math.PI) a -= Math.PI * 2; if (a <= -Math.PI) a += Math.PI * 2; return a; };
+  // Scripted camera turn: we drive the camera azimuth AND polar ourselves (autoRotate + damping OFF)
+  // so the move is exact. Both angles are eased, so it glides smoothly from WHATEVER angle you're at
+  // (high/low/spun) to the resting view — no snap. controls.update() reads camera.position and stays in sync.
+  const camAnim = { active:false, from:0, to:0, fromPolar:Math.PI/2, toPolar:Math.PI/2, t:0, dur:1.2, radius:3, onDone:null };
+  function startCamTurn(toAngle, dur, onDone, toPolar){
+    camAnim.from = controls.getAzimuthalAngle();
+    camAnim.fromPolar = controls.getPolarAngle();
+    camAnim.toPolar = (toPolar != null) ? toPolar : Math.PI / 2;   // default: settle level
+    camAnim.to = toAngle; camAnim.t = 0; camAnim.dur = dur; camAnim.onDone = onDone || null;
+    camAnim.radius = camera.position.distanceTo(controls.target);
+    camAnim.active = true;
+    controls.autoRotate = false; controls.enableDamping = false;
+  }
 
   // ── ONLY ONE FOLDER OPEN AT A TIME ─────────────────────────────────
   // Each folder registers its close() here; opening a folder first closes whichever
@@ -738,10 +830,24 @@
 
     if (isBrainLoaded) {
       brainModel.rotation.set(parseFloat(inputs.tiltX.value), parseFloat(inputs.tiltY.value), parseFloat(inputs.tiltZ.value));
-      // ease the auto-rotation toward its target (0 while a folder is open) for a smooth, firm stop
-      spinCur += (spinTarget - spinCur) * (1 - Math.exp(-dt / SPIN_TAU));
-      if (spinTarget === 0 && spinCur < 0.02) spinCur = 0;   // settle firmly to a full halt
-      controls.autoRotateSpeed = spinCur;
+      if (camAnim.active) {
+        // EASTER EGG: ease BOTH the azimuth and the polar (vertical) angle from wherever the camera
+        // currently is to the resting view — so it glides smoothly from any high/low angle, never snaps.
+        // controls.update() below reads this position and keeps it.
+        camAnim.t = Math.min(1, camAnim.t + dt / camAnim.dur);
+        const u = camAnim.t, e = u * u * u * (u * (u * 6 - 15) + 10);   // smootherstep — gentle accel + settle
+        const th = camAnim.from + (camAnim.to - camAnim.from) * e;
+        const ph = camAnim.fromPolar + (camAnim.toPolar - camAnim.fromPolar) * e;
+        const r = camAnim.radius, tg = controls.target, sp = Math.sin(ph);
+        camera.position.set(tg.x + r * sp * Math.sin(th), tg.y + r * Math.cos(ph), tg.z + r * sp * Math.cos(th));
+        camera.lookAt(tg);
+        if (camAnim.t >= 1) { camAnim.active = false; const cb = camAnim.onDone; camAnim.onDone = null; if (cb) cb(); }
+      } else {
+        // ease the auto-rotation toward its target (0 while a folder is open) for a smooth, firm stop
+        spinCur += (spinTarget - spinCur) * (1 - Math.exp(-dt / SPIN_TAU));
+        if (spinTarget === 0 && spinCur < 0.02) spinCur = 0;   // settle firmly to a full halt
+        controls.autoRotateSpeed = spinCur;
+      }
       controls.update(dt);
       updateLightRig();
       updatePanels(dt);                     // ← project the attached manifestations every frame
@@ -868,6 +974,7 @@
     if (!isBrainLoaded || !PANELS.length) return;
     const rect = displayCanvas.getBoundingClientRect();
     const camN = camera.position.clone().normalize();
+    const camDist = camera.position.length();   // brain CENTRE → camera; the front/back divide plane
     for (const p of PANELS) {
       _v.copy(p.anchor);
       const dist = _v.distanceTo(camera.position);
@@ -881,17 +988,29 @@
       p.el.style.left = sx + 'px';
       p.el.style.top  = sy + 'px';
       p.el.style.transform = `translate(-50%,-50%) scale(${(depthScale * p.scale * PANEL_SCALE).toFixed(3)})`;
-      // OCCLUSION, not fade: a far-side panel drops BEHIND the opaque brain canvas
-      // (z 5 < canvas 10) so the brain physically hides it; a near-side panel sits in
-      // front (z 20). The panel itself stays flat, 2D and fully opaque the whole orbit.
-      p.el.style.zIndex = facing >= 0 ? '20' : '5';
+      // OCCLUSION + DEPTH-SORT: z-index is a CONTINUOUS function of the panel's real
+      // distance to the camera, with the brain canvas (z 10) as the divider plane.
+      // A panel nearer than the brain centre lands above 10 (in front of the brain);
+      // one further away lands below 10 (behind it, occluded). Because every panel gets
+      // its own depth-scaled value, two panels on the SAME side now stack correctly by
+      // depth instead of by DOM order — so e.g. TOKENS no longer paints over a closer card.
+      const rel = (camDist - dist) / modelRadius;        // +near … −far  (≈ ±1 across the brain)
+      p.el.style.zIndex = Math.round(10 + rel * 100);     // brain=10; front 10→~110, back 10→~-90
       const offEdge = Math.max(Math.abs(_v.x), Math.abs(_v.y));
       const onScreen = offEdge < 1.7 ? 1 : 0;          // frustum safety only — no orbit fade
-      if (!p.skipOpacity) {
-        p.opacity += (onScreen - p.opacity) * 0.3;
+      if (p.isVault) {
+        // EASTER EGG: the vault's visibility tracks the reveal state, not the frustum.
+        p.opacity += ((vaultReveal ? 1 : 0) - p.opacity) * 0.1;
         p.el.style.opacity = p.opacity.toFixed(3);
+        p.el.style.pointerEvents = (vaultState === 'shown' && vaultReveal) ? 'auto' : 'none';
+      } else {
+        if (!p.skipOpacity) {
+          const target = vaultHidden ? 0 : onScreen;          // EASTER EGG: fade all panels out in vault mode
+          p.opacity += (target - p.opacity) * (vaultHidden ? 0.12 : 0.3);
+          p.el.style.opacity = p.opacity.toFixed(3);
+        }
+        p.el.style.pointerEvents = (!vaultHidden && facing > 0.05 && onScreen) ? 'auto' : 'none';
       }
-      p.el.style.pointerEvents = (facing > 0.05 && onScreen) ? 'auto' : 'none';
     }
     drawFolderLinks(dt);
   }
@@ -1101,7 +1220,7 @@
     const SPECS = [
       { tx:-181, ty:-101, k:0.68, delay:0,                       // Notes Editor 1 — Apple Notes "Ideas"
         html:`<div class="note" style="--w:262px; --t:21%; --l:8.3%; --r:10%; --fs:17px; --lh:1.5; --col:#363636;">
-                <img class="chrome" src="../panels/notesEditor1.webp" alt="Notes editor" draggable="false">
+                <img class="chrome" src="../panels/notesEditor1.webp" width="687" height="651" alt="Notes editor" draggable="false">
                 <div class="type" style="font-family:var(--sans);"></div>
               </div>`,
         init: w => typewriter(w.querySelector('.type'), [IDEAS_NOTE]) },
@@ -1167,7 +1286,7 @@
         init: w => initTodo(w.querySelector('.todo')) },
       { tx:128, ty:-150, k:0.50, delay:90,                       // Notes Editor 2 — TextEdit "Products to build"
         html:`<div class="note" style="--w:300px; --t:22.8%; --l:9.5%; --r:9%; --fs:13px; --lh:1.4; --col:#111;">
-                <img class="chrome" src="../panels/notesEditor2.webp" alt="Notes editor" draggable="false">
+                <img class="chrome" src="../panels/notesEditor2.webp" width="822" height="1041" alt="Notes editor" draggable="false">
                 <div class="type" style="font-family:Helvetica,Arial,var(--sans);"></div>
               </div>`,
         init: w => typewriter(w.querySelector('.type'), [PRODUCTS_NOTE]) }
@@ -1239,7 +1358,7 @@
                 </div>
                 <div class="body">
                   <div class="h">AI Kitchen Co-Pilot</div>
-                  <img class="scene" src="assets/kitchenScene.png" alt="pixel kitchen" draggable="false">
+                  <img class="scene" src="assets/kitchenScene.png" width="772" height="464" alt="pixel kitchen" draggable="false">
                   <div class="chat">
                     <div class="bub user">Cook something impressive using only paneer, two onions, and emotional damage.</div>
                     <div class="bub ai" data-ai-line>Okay. Pick an option from the list:</div>
@@ -1250,7 +1369,7 @@
         init: w => initKitchen(w.querySelector('.kit')) },
       { tx:180, ty:-95, k:0.54, delay:180,                       // Notes Editor 3 — iOS Notes
         html:`<div class="note" style="--w:300px; --t:24%; --l:5.5%; --r:5%; --fs:17px; --lh:1.32; --col:#363636;">
-                <img class="chrome" src="../panels/notesEditor3.webp" alt="Notes editor" draggable="false">
+                <img class="chrome" src="../panels/notesEditor3.webp" width="1056" height="611" alt="Notes editor" draggable="false">
                 <div class="type" style="font-family:var(--sans);"></div>
               </div>`,
         init: w => typewriter(w.querySelector('.type'), [THINGS_NOTE]) }
@@ -1369,7 +1488,7 @@
         init: w => initAutomation(w.querySelector('.auto')) },
       { tx:175, ty:-165, k:0.73, delay:90,                       // Notes Editor 4 — grown to match the Flow's height (balanced pair)
         html:`<div class="note a4note">
-                <img class="chrome" src="../panels/notesEditor4.webp" alt="Notes editor" draggable="false">
+                <img class="chrome" src="../panels/notesEditor4.webp" width="1879" height="1521" alt="Notes editor" draggable="false">
                 <div class="a4">
                   <div class="a4-title">What all can be automated?</div>
                   <div class="a4-body">
@@ -1707,6 +1826,32 @@
     place(buildIdeas2am(),       270, UP, FOLDER);   // LEFT — folder (upper)
     place(buildModel(),          315, DN);           // LEFT — leaderboard (lower)
     place(buildTokens(),         315, 0.80, 1.05);    // UPPER-LEFT — elevated above the leaderboard, balancing the right cluster
+
+    // EASTER EGG: the hidden "Forbidden Vault" lives on the BACK of the brain (phi=180), so a
+    // half-turn brings it face-on. It's the hero of that view (bigger scale) and is excluded from
+    // the normal frustum-fade — its opacity is driven by the reveal state instead.
+    const vp = VAULT_VIEW_AZIMUTH_DEG * Math.PI / 180;   // faces the camera at the reveal's side-view azimuth
+    vaultEntry = addAnchored(buildVault(),
+      surfaceAnchor(new THREE.Vector3(Math.sin(vp), 0.12, Math.cos(vp))), FOLDER, { isVault:true, skipOpacity:true });
+
+    // give every folder its frosted-glass panes (cosmetic; never the vault/data panels)
+    document.querySelectorAll('.panel.folder').forEach(addFolderGlass);
+  }
+
+  // GLASSMORPHISM: behind each folder icon, a pane that backdrop-blurs the brain through
+  // the folder's silhouette; in front, a pane with a light sheen. Both masked to the
+  // folder's own PNG, pointer-events:none, purely cosmetic — added once, after the img,
+  // so z-index (not DOM order) sets paint order and the fan/click logic is untouched.
+  function addFolderGlass(folderEl) {
+    const img = folderEl.querySelector(':scope > img');
+    if (!img || folderEl.querySelector(':scope > .fglass')) return;
+    const mask = `url("${img.getAttribute('src')}")`;
+    ['fglass', 'fsheen'].forEach(cls => {
+      const g = document.createElement('div');
+      g.className = cls;
+      g.style.setProperty('--mask', mask);
+      folderEl.appendChild(g);
+    });
   }
 
   function mk(cls, html){ const d=document.createElement('div'); d.className='panel '+cls; d.innerHTML=html; panelsLayer.appendChild(d); return d; }
@@ -1737,6 +1882,20 @@
     makeIdeas2amPanels(d);
     return d;
   };
+
+  /* ── EASTER EGG: the hidden "Forbidden Vault" glass folder (Figma 2052:139) ── */
+  function buildVault() {
+    const d = mk('vault', `<div class="vault-folder">
+      <div class="vf-glow"></div>
+      <img class="vf-tab"  src="assets/vaultTab.svg"  alt="" draggable="false"/>
+      <img class="vf-body" src="assets/vaultBody.svg" alt="" draggable="false"/>
+      <div class="vf-title">Forbidden<br>Vault</div>
+    </div>`);
+    // clicking the vault itself must NOT dismiss the reveal (reserved for its future contents)
+    d.addEventListener('click', e => e.stopPropagation());
+    d.addEventListener('contextmenu', e => e.stopPropagation());
+    return d;
+  }
 
   /* ── TOKENS (Figma) — black usage-meter card: dot-matrix title + dotted spend bar + DETAILS pill ── */
   function buildTokens() {
@@ -1884,6 +2043,80 @@
     return d;
   }
 
+  /* ════════════════════════════════════════════════════════════════════
+     EASTER EGG WIRING — custom context menu + reveal / dismiss
+     ════════════════════════════════════════════════════════════════════ */
+  const ctxMenu = document.getElementById('ctxMenu');
+  const ctxShowVault = document.getElementById('ctxShowVault');
+
+  function showCtxMenu(x, y) {
+    ctxMenu.classList.add('open'); ctxMenu.setAttribute('aria-hidden', 'false');
+    const r = ctxMenu.getBoundingClientRect();                 // measure now that it's displayed
+    ctxMenu.style.left = Math.max(6, Math.min(x, window.innerWidth  - r.width  - 6)) + 'px';
+    ctxMenu.style.top  = Math.max(6, Math.min(y, window.innerHeight - r.height - 6)) + 'px';
+  }
+  function hideCtxMenu() { ctxMenu.classList.remove('open'); ctxMenu.setAttribute('aria-hidden', 'true'); }
+
+  function enterVault() {
+    if (vaultState !== 'idle' || !isBrainLoaded) return;
+    vaultState = 'entering';
+    document.body.classList.add('vault-mode');     // fade the HUD chrome + folder-link lines
+    vaultHidden = true;                            // fade the 8 panels out (driven in updatePanels)
+    brainHold('vault');                            // ease the idle spin to a stop + lock drag
+    vaultReturnAz = controls.getAzimuthalAngle();      // remember where to spin back to on dismiss
+    vaultReturnPolar = controls.getPolarAngle();       // …and the vertical angle you were at
+    setTimeout(() => {                             // …then turn to the side view and reveal the vault
+      if (vaultState !== 'entering') return;
+      vaultReveal = true;
+      // ease from the CURRENT angle to the ABSOLUTE side-view azimuth (shortest path) + level polar,
+      // so it lands the same every time and never snaps regardless of your starting angle.
+      const cur = controls.getAzimuthalAngle();
+      const goal = VAULT_VIEW_AZIMUTH_DEG * Math.PI / 180;
+      startCamTurn(cur + normalizeAngle(goal - cur), 2.0, () => { vaultState = 'shown'; });
+    }, 420);
+  }
+  function exitVault() {
+    if (vaultState !== 'shown') return;
+    vaultState = 'exiting';
+    vaultReveal = false;                           // fade the vault out
+    const cur = controls.getAzimuthalAngle();      // spin back to the original azimuth + vertical angle (shortest path)
+    startCamTurn(cur + normalizeAngle(vaultReturnAz - cur), 2.0, () => {
+      controls.autoRotate = true; controls.enableDamping = true;   // restore the live controls
+      document.body.classList.remove('vault-mode'); // fade the HUD chrome back in
+      vaultHidden = false;                           // fade the 8 panels back in
+      brainRelease('vault');                         // resume idle spin + unlock drag
+      vaultState = 'idle';
+    }, vaultReturnPolar);                            // ease back to the vertical angle you were at
+  }
+
+  // Replace the native browser menu across the whole page.
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (vaultState !== 'idle') return;             // suppressed while the vault is busy / shown
+    showCtxMenu(e.clientX, e.clientY);
+  });
+  ctxShowVault.addEventListener('click', (e) => { e.stopPropagation(); hideCtxMenu(); enterVault(); });
+
+  // Click-away (capture phase): close the menu, or — when the vault is shown — exit the vault
+  // for any click outside the vault folder itself.
+  document.addEventListener('click', (e) => {
+    if (ctxMenu.classList.contains('open') && !ctxMenu.contains(e.target)) hideCtxMenu();
+    if (vaultState === 'shown' && !(vaultEntry && vaultEntry.el.contains(e.target))) exitVault();
+    // CLICK-AWAY TO CLOSE A FOLDER: a click anywhere that isn't the open folder — its icon or
+    // any of its opened panels — collapses it. Clicks on ANOTHER folder are left alone so that
+    // folder's own logic can swap which one is open (the one-folder-at-a-time rule).
+    if (_openFolderEl && !_openFolderEl.contains(e.target) &&
+        !(e.target.closest && e.target.closest('.panel.folder'))) {
+      const closeOpen = _folderClosers.get(_openFolderEl);
+      if (closeOpen) closeOpen();
+    }
+  }, true);
+  window.addEventListener('blur', hideCtxMenu);
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (ctxMenu.classList.contains('open')) hideCtxMenu();
+    else if (vaultState === 'shown') exitVault();
+  });
 
 </script>
 </body>
