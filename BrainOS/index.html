@@ -115,7 +115,9 @@
   .board .row .nm{ flex:1; font-size:14px; color:#fff; font-weight:300; letter-spacing:-0.3px; }
   .board .row .sc{ font-size:14px; color:#00be6f; font-weight:600; padding-right:7px; font-variant-numeric:tabular-nums; }
 
-  /* folder-to-folder connection lines (electric blue, glowing) — drawn between folders only */
+  /* folder-to-folder connection lines (electric blue, glowing) — drawn between folders only.
+     z-index 15 sits ABOVE the brain so visible-folder links read crisp; the one line heading to a
+     folder behind the brain is clipped to the periphery in JS (see drawFolderLinks). */
   #folderLinks{ position:absolute; inset:0; z-index:15; pointer-events:none;
     filter:drop-shadow(0 0 3px rgba(70,110,255,.9)); overflow:visible; }
   #folderLinks line{ stroke:#3a5bff; stroke-width:2; stroke-linecap:round; }
@@ -439,7 +441,7 @@
       brainModel.rotation.set(parseFloat(inputs.tiltX.value), parseFloat(inputs.tiltY.value), parseFloat(inputs.tiltZ.value));
       controls.update(dt);
       updateLightRig();
-      updatePanels();                       // ← project the attached manifestations every frame
+      updatePanels(dt);                     // ← project the attached manifestations every frame
       renderer.render(scene, camera);
     }
 
@@ -559,7 +561,7 @@
     return d.multiplyScalar(radius + modelRadius * lift);
   }
 
-  function updatePanels() {
+  function updatePanels(dt) {
     if (!isBrainLoaded || !PANELS.length) return;
     const rect = displayCanvas.getBoundingClientRect();
     const camN = camera.position.clone().normalize();
@@ -588,30 +590,52 @@
       }
       p.el.style.pointerEvents = (facing > 0.05 && onScreen) ? 'auto' : 'none';
     }
-    drawFolderLinks();
+    drawFolderLinks(dt);
   }
 
   // ── FOLDER CONNECTIONS ──────────────────────────────────────────────
   // Thin glowing electric-blue lines drawn between the FOLDERS only (never the
-  // data panels), with a small square node at each end — exactly like the ref.
-  // Every folder connects to every other; a line only shows while BOTH of its
-  // folders face the camera, fading out as either swings behind the brain.
-  const linkSvg = document.getElementById('folderLinks');
-  const SVGNS = 'http://www.w3.org/2000/svg';
-  let folderEntries = [], linkEdges = [];
+  // data panels), with a small square node at each end — like the reference.
+  //
+  // RING TOPOLOGY: each folder links only to its NEIGHBOURS around the brain
+  // (folders sorted by azimuth, closed into a loop) — never across to a far
+  // folder on the back side.
+  //
+  // GROW / RETRACT: a line's drawn length tracks how visible its FAR folder is.
+  // The line grows out of the visible (anchor) folder toward a neighbour as the
+  // neighbour comes into view, and smoothly retracts + fades as it swings behind
+  // — so it never reaches, points at, or runs behind a hidden folder.
+  const linkSvg  = document.getElementById('folderLinks');
+  const SVGNS    = 'http://www.w3.org/2000/svg';
+  const LINK_TAU = 0.12;   // grow/retract easing time constant (s)
+  let folderEntries = [], linkEdges = [], linkDefs = null;
   function setupFolderLinks() {
     folderEntries = PANELS.filter(p => p.el.classList.contains('folder'));
     linkEdges = [];
     linkSvg.innerHTML = '';
-    for (let i = 0; i < folderEntries.length; i++) {
-      for (let j = i + 1; j < folderEntries.length; j++) {
-        const ln = document.createElementNS(SVGNS, 'line');
-        const r1 = document.createElementNS(SVGNS, 'rect');
-        const r2 = document.createElementNS(SVGNS, 'rect');
-        [r1, r2].forEach(r => { r.setAttribute('width', 7); r.setAttribute('height', 7); });
-        linkSvg.append(ln, r1, r2);
-        linkEdges.push({ a: folderEntries[i], b: folderEntries[j], ln, r1, r2 });
-      }
+    linkDefs = document.createElementNS(SVGNS, 'defs');
+    linkSvg.appendChild(linkDefs);
+    // order folders by azimuth around the vertical axis → a stable ring
+    const order = folderEntries
+      .map((p, i) => ({ p, i, phi: Math.atan2(p.anchor.x, p.anchor.z) }))
+      .sort((a, b) => a.phi - b.phi)
+      .map(o => o.p);
+    const N = order.length;
+    for (let i = 0; i < N; i++) {
+      const a = order[i], b = order[(i + 1) % N];      // consecutive neighbours, closed loop
+      const grad = document.createElementNS(SVGNS, 'linearGradient');
+      grad.id = 'flgrad_' + i;
+      grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+      const s0 = document.createElementNS(SVGNS, 'stop'); s0.setAttribute('offset', '0');
+      const s1 = document.createElementNS(SVGNS, 'stop'); s1.setAttribute('offset', '1');
+      grad.append(s0, s1); linkDefs.appendChild(grad);
+      const ln = document.createElementNS(SVGNS, 'line');
+      ln.setAttribute('stroke', 'url(#flgrad_' + i + ')');
+      const r1 = document.createElementNS(SVGNS, 'rect');
+      const r2 = document.createElementNS(SVGNS, 'rect');
+      [r1, r2].forEach(r => { r.setAttribute('width', 7); r.setAttribute('height', 7); });
+      linkSvg.append(ln, r1, r2);
+      linkEdges.push({ a, b, ln, r1, r2, grad, s0, s1, p: 0 });
     }
   }
   // pick the corner of rect nearest to point (tx,ty) → lines attach at folder corners
@@ -620,26 +644,50 @@
     const ys = (ty < rect.top + rect.height / 2) ? rect.top : rect.bottom;
     return { x: xs, y: ys };
   }
-  function frontness(f) { return THREE.MathUtils.clamp((f + 0.25) / 0.5, 0, 1); }
-  function drawFolderLinks() {
+  function frontness(f) { return THREE.MathUtils.clamp((f + 0.2) / 0.5, 0, 1); }
+  function smoothstep(e0, e1, x) { const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
+  function drawFolderLinks(dt) {
     if (!linkEdges.length) return;
+    const k = 1 - Math.exp(-(dt || 0.016) / LINK_TAU);   // frame-rate-independent ease factor
     for (const e of linkEdges) {
-      const oa = frontness(e.a._facing), ob = frontness(e.b._facing);
-      const vis = Math.min(oa, ob);
-      if (vis <= 0.02 || e.a._sx == null || e.b._sx == null) {
+      const fa = frontness(e.a._facing), fb = frontness(e.b._facing);
+      // anchor = the more front-facing folder; far = the one that may be swinging behind
+      const aFront = fa >= fb;
+      const anchorE = aFront ? e.a : e.b, farE = aFront ? e.b : e.a;
+      const anchorF = aFront ? fa : fb, farF = aFront ? fb : fa;
+
+      if (Math.max(fa, fb) < 0.04 || e.a._sx == null || e.b._sx == null) {
+        e.p = 0;
         e.ln.style.display = e.r1.style.display = e.r2.style.display = 'none';
         continue;
       }
-      const ra = e.a.el.querySelector('img').getBoundingClientRect();
-      const rb = e.b.el.querySelector('img').getBoundingClientRect();
-      const ca = nearestCorner(ra, e.b._sx, e.b._sy);
-      const cb = nearestCorner(rb, e.a._sx, e.a._sy);
-      e.ln.setAttribute('x1', ca.x); e.ln.setAttribute('y1', ca.y);
-      e.ln.setAttribute('x2', cb.x); e.ln.setAttribute('y2', cb.y);
-      e.r1.setAttribute('x', ca.x - 3.5); e.r1.setAttribute('y', ca.y - 3.5);
-      e.r2.setAttribute('x', cb.x - 3.5); e.r2.setAttribute('y', cb.y - 3.5);
+      // GROW / RETRACT: the drawn length tracks how visible the FAR folder is. As the far folder
+      // comes into view the line grows toward it; as it swings behind, the line retracts toward the
+      // visible (anchor) folder and fades — so it never reaches, points at, or runs behind a hidden
+      // folder. Symmetric on both sides; no brain-disc geometry needed.
+      e.p += (farF - e.p) * k;
+
+      const ra = anchorE.el.querySelector('img').getBoundingClientRect();
+      const rb = farE.el.querySelector('img').getBoundingClientRect();
+      const A  = nearestCorner(ra, farE._sx, farE._sy);          // bright anchor corner (visible folder)
+      const B  = nearestCorner(rb, anchorE._sx, anchorE._sy);    // far corner (folder it points at)
+      const hx = A.x + (B.x - A.x) * e.p, hy = A.y + (B.y - A.y) * e.p;   // drawn head (grows/retracts)
+
+      e.ln.setAttribute('x1', A.x); e.ln.setAttribute('y1', A.y);
+      e.ln.setAttribute('x2', hx);  e.ln.setAttribute('y2', hy);
+      // gradient: bright at the anchor, the retracting far end softly fades out as the folder hides
+      e.grad.setAttribute('x1', A.x); e.grad.setAttribute('y1', A.y);
+      e.grad.setAttribute('x2', hx);  e.grad.setAttribute('y2', hy);
+      e.s0.setAttribute('stop-color', '#3a5bff'); e.s1.setAttribute('stop-color', '#3a5bff');
+      e.s0.setAttribute('stop-opacity', anchorF.toFixed(3));
+      e.s1.setAttribute('stop-opacity', (farF * farF).toFixed(3));
+
+      // anchor node at the visible folder; head node only once the line has reached the far folder
+      e.r1.setAttribute('x', A.x - 3.5); e.r1.setAttribute('y', A.y - 3.5);
+      e.r2.setAttribute('x', hx - 3.5);  e.r2.setAttribute('y', hy - 3.5);
       e.ln.style.display = e.r1.style.display = e.r2.style.display = '';
-      e.ln.style.opacity = e.r1.style.opacity = e.r2.style.opacity = vis.toFixed(2);
+      e.r1.style.opacity = anchorF.toFixed(2);
+      e.r2.style.opacity = (farF * smoothstep(0.9, 1, e.p)).toFixed(2);
     }
   }
 
@@ -718,11 +766,11 @@
       addAnchored(build, surfaceAnchor(new THREE.Vector3(Math.sin(p), y, Math.cos(p))), scale);
     };
     place(buildPodcast(),          0, UP);           // front — upper
-    place(buildSideHustle(),      45, DN, FOLDER);   // RIGHT — folder (lower)
-    place(buildClaudeMd(),        90, UP, FOLDER);   // RIGHT — folder (upper)
+    place(buildThingsAi(),        45, DN, FOLDER);   // RIGHT — folder (lower)
+    place(buildProductsBuild(),   90, UP, FOLDER);   // RIGHT — folder (upper)
     place(buildTerminal(),       180, UP, 1.55);      // back — upper (enlarged)
-    place(buildRandomThoughts(), 225, DN, FOLDER);   // LEFT — folder (lower)
-    place(buildAiResources(),    270, UP, FOLDER);   // LEFT — folder (upper)
+    place(buildAutomations(),    225, DN, FOLDER);   // LEFT — folder (lower)
+    place(buildIdeas2am(),       270, UP, FOLDER);   // LEFT — folder (upper)
     place(buildModel(),          315, DN);           // LEFT — leaderboard (lower)
   }
 
@@ -734,10 +782,10 @@
     makeFan(d, files, isPage);
     return d;
   }
-  const buildSideHustle    = () => folder('sideHustleFolder.png',     'Side Hustle Ideas',    ['AI Newsletter', 'Prompt Marketplace', 'Micro-SaaS app', 'Faceless YouTube'], false);
-  const buildClaudeMd      = () => folder('claudeMdFolder.png',       'Claude.MD',            ['coding-rules.md', 'tone-of-voice.md', 'agent-system.md', 'context-window.md'], true);
-  const buildRandomThoughts= () => folder('randomThoughtsFolder.png', 'Random Thoughts',      ['what if agents dream?', 'is taste the moat?', 'ship &gt; perfect', 'touch grass (maybe)'], false);
-  const buildAiResources   = () => folder('aiResourcesFolder.png',    'AI Content Resources', ['best-prompts.pdf', 'model cheat-sheet', 'eval datasets', 'fine-tune guide'], true);
+  const buildThingsAi      = () => folder('thingsThatCouldBeAiFolder.png', 'Things That Could Be AI', ['my morning coffee', 'reply-all emails', 'standup updates', 'expense reports'], false);
+  const buildProductsBuild = () => folder('productsToBuildFolder.png',     'Products to Build',       ['AI résumé tailor', 'meeting summarizer', 'inbox-zero bot', 'prompt linter'], false);
+  const buildAutomations   = () => folder('automationsFolder.png',         'Automations',             ['inbox → Notion', 'PR → Slack ping', 'receipts → sheet', 'standup auto-post'], false);
+  const buildIdeas2am      = () => folder('ideasAt2amFolder.png',          'Ideas at 2 AM',           ['app that naps for you', 'AI that says no', 'startup: touch grass', 'what if RAM dreams?'], true);
 
   /* ── TERMINAL — real streaming logs, chaotic on hover ── */
   function buildTerminal() {

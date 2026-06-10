@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BrainOS — Interaction Windows (workbench)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  BRAINOS · INTERACTION WINDOWS — WORKBENCH
+  ════════════════════════════════════════════════════════════════════════
+  A standalone development page holding every pop-up window that will later be
+  wired into index.html (each window appears when its folder on the brain is
+  opened). Built here in isolation so each panel + its interaction can be tuned
+  on its own, grouped under the folder it belongs to. Nothing here touches
+  index.html — once these feel right you'll ask me to plug them in.
+
+  Folders & windows
+    1 · Ideas at 2 AM        → Notes Editor 1 (typewriter) · Captcha · Doc File
+    2 · Products to Build     → To-do List · Notes Editor 2 (typewriter)
+    3 · Things That Could Be AI → Football Tracker (drag) · AI Kitchen Co-Pilot · Notes Editor 3
+    4 · Automations           → Automation Flow (auto-connect) · Notes Editor 4
+
+  Assets
+    folder icons + kitchen pixel art → ./assets/
+    notes-editor chrome (HD)         → ../panels/notesEditor{1..4}.webp
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  :root{
+    --bg:#06070b; --bg-2:#0a0c12;
+    --ink:#eef0f6; --muted:#7f8499; --muted-2:#565b6e; --line:#1b1d27;
+    --blue:#3a5bff; --blue-soft:#6b9bff; --green:#3dffa3; --amber:#ffb84d; --violet:#a78bff;
+    --spring:cubic-bezier(.16,1.3,.3,1); --soft:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Monaco,"Cascadia Code",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    background:
+      radial-gradient(900px 600px at 15% -5%, rgba(58,91,255,.10), transparent 60%),
+      radial-gradient(900px 600px at 100% 0%, rgba(61,255,163,.06), transparent 55%),
+      var(--bg);
+    color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .mono{font-family:var(--mono);}
+
+  /* ── page chrome ── */
+  header.page{ padding:34px 40px 10px; max-width:1320px; margin:0 auto; }
+  header.page .kicker{ font-family:var(--mono); font-size:11px; letter-spacing:3px; text-transform:uppercase;
+    color:var(--blue-soft); display:flex; align-items:center; gap:9px; }
+  header.page .kicker .ld{ width:7px;height:7px;border-radius:50%; background:var(--green); box-shadow:0 0 9px var(--green); animation:pulse 1.7s infinite; }
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+  header.page h1{ font-size:30px; font-weight:750; letter-spacing:-.6px; margin:12px 0 6px; }
+  header.page p{ color:var(--muted); font-size:13.5px; max-width:680px; line-height:1.55; margin:0; }
+  header.page p code{ font-family:var(--mono); background:#15171f; color:#ffd97a; padding:1px 6px; border-radius:5px; font-size:12px; }
+
+  main{ max-width:1320px; margin:0 auto; padding:18px 40px 90px; }
+
+  /* ── folder section ── */
+  .folder-sec{ margin-top:42px; }
+  .folder-head{ display:flex; align-items:center; gap:14px; padding-bottom:20px; border-bottom:1px solid var(--line); }
+  .folder-head img{ width:46px; height:auto; filter:drop-shadow(0 8px 16px rgba(0,0,0,.5)); }
+  .folder-head .ttl{ font-size:18px; font-weight:650; letter-spacing:-.3px; }
+  .folder-head .sub{ font-family:var(--mono); font-size:11px; letter-spacing:1.4px; text-transform:uppercase; color:var(--muted-2); margin-top:3px; }
+  .folder-head .count{ margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted);
+    border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
+
+  /* ── stage grid ── */
+  .stages{ display:flex; flex-wrap:wrap; gap:22px; padding-top:26px; align-items:flex-start; }
+  .stage{ background:rgba(255,255,255,.018); border:1px solid rgba(255,255,255,.06); border-radius:18px;
+    padding:26px; display:flex; flex-direction:column; align-items:center; gap:16px;
+    transition:border-color .35s, background .35s, transform .35s var(--soft); }
+  .stage:hover{ border-color:rgba(107,155,255,.28); background:rgba(255,255,255,.03); }
+  .stage .cap{ text-align:center; }
+  .stage .cap .nm{ font-size:13px; font-weight:600; letter-spacing:-.2px; }
+  .stage .cap .tag{ font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--muted-2); margin-top:5px; display:inline-flex; align-items:center; gap:6px; }
+  .stage .cap .tag::before{ content:""; width:5px;height:5px;border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); }
+  .stage.full{ width:100%; }
+
+  /* a soft "screen" platform under each window so light panels read on the dark page */
+  .platform{ filter:drop-shadow(0 26px 50px rgba(0,0,0,.55)); }
+
+  /* ════════════ shared macOS window chrome (light) ════════════ */
+  .mac{ border-radius:13px; overflow:hidden; background:#fff; border:1px solid rgba(0,0,0,.14); }
+  .mac .bar{ position:relative; height:30px; display:flex; align-items:center; padding:0 12px; gap:8px;
+    background:linear-gradient(#f3f3f4,#e3e3e5); border-bottom:1px solid #d2d2d6; }
+  .mac .bar .lights{ display:flex; gap:7px; }
+  .mac .bar .lights i{ width:11px;height:11px;border-radius:50%; }
+  .mac .bar .lights .r{ background:#ff5f56;} .mac .bar .lights .y{ background:#febc2e;} .mac .bar .lights .g{ background:#28c840;}
+  .mac .bar .title{ position:absolute; left:0; right:0; text-align:center; font-size:12px; color:#4f4f56;
+    font-weight:500; pointer-events:none; }
+  .mac .bar .title .chev{ color:#9a9aa2; margin-left:5px; font-size:10px; }
+
+  /* ════════════════════════════════════════════════════════════════
+     NOTES EDITORS (1–4) — HD Figma chrome as background, live typewriter
+     text overlaid in the editor's content area. Types on fast, holds 5s,
+     erases (reverse typewriter), next note. Insets are per-editor.
+     ════════════════════════════════════════════════════════════════ */
+  .note{ position:relative; width:var(--w); border-radius:12px; overflow:hidden; }
+  .note img.chrome{ display:block; width:100%; height:auto; user-select:none; -webkit-user-drag:none; }
+  .note .type{ position:absolute; top:var(--t); left:var(--l); right:var(--r); bottom:6%;
+    white-space:pre-wrap; word-break:break-word; overflow:hidden;
+    font-size:var(--fs); line-height:var(--lh,1.45); color:var(--col,#26262a); }
+  .note .type .caret{ display:inline-block; width:2px; height:1.05em; vertical-align:-2px;
+    background:currentColor; margin-left:1px; animation:blink 1s steps(1) infinite; }
+  @keyframes blink{50%{opacity:0;}}
+
+  /* ════════════════════════════════════════════════════════════════
+     CAPTCHA — Apple-Notes "Draft" window + interactive reCAPTCHA
+     ════════════════════════════════════════════════════════════════ */
+  .cap-win{ width:300px; }
+  .cap-win .toolbar{ display:flex; align-items:center; gap:14px; padding:7px 14px; background:#faf6f5;
+    border-bottom:1px solid #ece4e2; color:#b9b1af; font-size:13px; }
+  .cap-win .toolbar .glyph{ opacity:.75; }
+  .cap-win .body{ background:#fff; padding:22px 22px 26px; }
+  .cap-win .q{ font-size:21px; line-height:1.12; letter-spacing:-.4px; color:#161616; font-weight:450; margin:0 0 22px; }
+  .recaptcha{ display:flex; align-items:center; gap:12px; width:100%; max-width:256px;
+    border:1px solid #d3d3d3; border-radius:4px; background:#f9f9f9; padding:11px 13px;
+    box-shadow:0 1px 2px rgba(0,0,0,.08); user-select:none; }
+  .recaptcha .checkbox{ width:26px; height:26px; flex:none; border:2px solid #c1c1c1; border-radius:3px;
+    background:#fff; cursor:pointer; position:relative; transition:border-color .2s; }
+  .recaptcha .checkbox:hover{ border-color:#a4a4a4; }
+  .recaptcha .checkbox .spin{ position:absolute; inset:1px; border:3px solid #d9d9d9; border-top-color:#4a90d9;
+    border-radius:50%; opacity:0; animation:rcspin .7s linear infinite; }
+  .recaptcha .checkbox .tick{ position:absolute; inset:0; opacity:0; transform:scale(.4);
+    transition:opacity .25s, transform .35s var(--spring); }
+  .recaptcha .checkbox .tick svg{ width:100%; height:100%; }
+  .recaptcha.checking .checkbox{ border-color:transparent; }
+  .recaptcha.checking .checkbox .spin{ opacity:1; }
+  .recaptcha.done .checkbox{ border-color:transparent; }
+  .recaptcha.done .checkbox .tick{ opacity:1; transform:scale(1); }
+  @keyframes rcspin{to{transform:rotate(360deg);}}
+  .recaptcha .lbl{ font-size:14px; color:#3c3c3c; font-family:var(--sans); }
+  .recaptcha .brand{ margin-left:auto; text-align:center; color:#9b9b9b; }
+  .recaptcha .brand .rc-logo{ width:30px; height:30px; display:block; margin:0 auto; }
+  .recaptcha .brand .nm{ font-size:9px; letter-spacing:.2px; }
+  .recaptcha .brand .tos{ font-size:7px; }
+
+  /* ════════════════════════════════════════════════════════════════
+     DOC FILE — folded-corner document icon
+     ════════════════════════════════════════════════════════════════ */
+  .docfile{ width:180px; height:243px; position:relative; cursor:default;
+    background:linear-gradient(150deg,#ffffff 60%,#e6e6e9);
+    border-radius:11px; border-bottom-right-radius:11px;
+    box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.05);
+    clip-path:polygon(0 0, calc(100% - 38px) 0, 100% 38px, 100% 100%, 0 100%);
+    transition:transform .5s var(--spring); }
+  .docfile:hover{ transform:translateY(-5px) rotate(-1deg); }
+  .docfile .fold{ position:absolute; top:0; right:0; width:38px; height:38px;
+    background:linear-gradient(225deg,#cfcfd4,#fbfbfc); border-bottom-left-radius:7px;
+    box-shadow:-2px 2px 5px rgba(0,0,0,.12); }
+  .docfile .kind{ position:absolute; top:18px; left:14px; font-weight:700; font-size:27px;
+    letter-spacing:-.5px; color:#9a9a9f; }
+  .docfile .fname{ position:absolute; left:13px; right:13px; bottom:16px; font-size:15px; line-height:.95;
+    letter-spacing:-.4px; color:#141414; word-break:break-word; }
+
+  /* ════════════════════════════════════════════════════════════════
+     TO-DO LIST — white card, tickable rows, "+ Add" inserts a new idea
+     ════════════════════════════════════════════════════════════════ */
+  .todo{ width:330px; padding:18px 16px 18px; border-radius:11px;
+    background:linear-gradient(#ffffff 74%,#e9e9ec); border:1px solid #c9c9cf; }
+  .todo .top{ display:flex; align-items:center; margin-bottom:16px; }
+  .todo .top .h{ font-size:22px; font-weight:550; letter-spacing:-.7px; color:#0c0c0c; }
+  .todo .top .add{ margin-left:auto; background:#b4cdfd; color:#13213f; border:none; cursor:pointer;
+    font-family:var(--sans); font-size:15px; font-weight:600; letter-spacing:-.3px;
+    padding:7px 14px; border-radius:7px; transition:transform .2s, background .2s; }
+  .todo .top .add:hover{ background:#9dbcfb; } .todo .top .add:active{ transform:scale(.95); }
+  .todo .rows{ display:flex; flex-direction:column; gap:10px; }
+  .todo .item{ display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #111;
+    border-radius:9px; padding:11px 12px; overflow:hidden; max-height:90px;
+    animation:itemIn .45s var(--spring) both;
+    transition:max-height .4s var(--soft), opacity .32s ease, padding .4s var(--soft),
+               margin .4s var(--soft), transform .4s var(--soft), border-color .3s; }
+  @keyframes itemIn{from{opacity:0; transform:translateY(-8px) scale(.97);}}
+  /* clicked → "cut" (done), then collapses out of the list after 2s */
+  .todo .item.removing{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; margin-top:-10px;
+    transform:scale(.96); border-color:transparent; }
+  .todo .top .add.full{ animation:shake .34s; }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+  .todo .item .ic{ font-size:21px; flex:none; width:24px; text-align:center; }
+  .todo .item .nm{ flex:1; font-size:14px; color:#111; letter-spacing:-.2px; transition:color .25s; }
+  .todo .item .ck{ width:30px; height:30px; flex:none; border:1.4px solid #111; border-radius:6px;
+    cursor:pointer; position:relative; transition:background .2s, border-color .2s; }
+  .todo .item .ck svg{ position:absolute; inset:3px; opacity:0; transform:scale(.4);
+    transition:opacity .2s, transform .3s var(--spring); }
+  .todo .item.done .ck{ background:#1b8f4d; border-color:#1b8f4d; }
+  .todo .item.done .ck svg{ opacity:1; transform:scale(1); }
+  .todo .item.done .nm{ color:#9a9a9a; text-decoration:line-through; }
+
+  /* ════════════════════════════════════════════════════════════════
+     FOOTBALL TRACKER — Safari window, drag & throw the ball, the blue
+     detection box + label + dashed trail stay locked to it.
+     ════════════════════════════════════════════════════════════════ */
+  .ft-win{ width:400px; }
+  .ft-win .bar .url{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:#fff; border:1px solid #d6d6da; border-radius:7px; font-size:11px; color:#5a5a62;
+    padding:3px 16px; min-width:190px; text-align:center; }
+  .ft-field{ position:relative; height:262px; overflow:hidden; cursor:pointer;
+    background:
+      radial-gradient(120% 80% at 50% 0%, #fcfdff, #eef1f7);
+    touch-action:none; }
+  .ft-field.kick .ft-box{ box-shadow:0 0 0 2px rgba(27,77,255,.55), 0 0 22px rgba(27,77,255,.5); }
+  .ft-field .grid{ position:absolute; inset:0; opacity:.5;
+    background-image:linear-gradient(rgba(120,140,200,.10) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(120,140,200,.10) 1px,transparent 1px);
+    background-size:26px 26px; }
+  .ft-field .rec{ position:absolute; top:9px; right:11px; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:1px; color:#d23b3b; display:flex; align-items:center; gap:5px; }
+  .ft-field .rec .dot{ width:7px;height:7px;border-radius:50%; background:#e23b3b; animation:pulse 1.2s infinite; }
+  .ft-field .hint{ position:absolute; bottom:9px; left:11px; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:.6px; color:#9aa0b4; }
+  .ft-trail{ position:absolute; inset:0; pointer-events:none; }
+  .ft-trail polyline{ fill:none; stroke:#1b4dff; stroke-width:1.6; stroke-linecap:round;
+    stroke-dasharray:2 5; opacity:.55; }
+  .ft-ball{ position:absolute; left:0; top:0; width:46px; height:46px; font-size:40px; line-height:46px;
+    text-align:center; will-change:transform; pointer-events:none; user-select:none; z-index:3; }
+  .ft-box{ position:absolute; left:0; top:0; border:1.4px solid #1b4dff; pointer-events:none; z-index:2;
+    box-shadow:0 0 0 1px rgba(27,77,255,.12), 0 0 14px rgba(27,77,255,.25); }
+  .ft-box i{ position:absolute; width:8px; height:8px; border:1.6px solid #1b4dff; }
+  .ft-box i.tl{ left:-1px; top:-1px; border-right:none; border-bottom:none; }
+  .ft-box i.tr{ right:-1px; top:-1px; border-left:none; border-bottom:none; }
+  .ft-box i.bl{ left:-1px; bottom:-1px; border-right:none; border-top:none; }
+  .ft-box i.br{ right:-1px; bottom:-1px; border-left:none; border-top:none; }
+  .ft-box .lab{ position:absolute; left:-1px; top:-17px; background:#1b4dff; color:#fff;
+    font-family:var(--mono); font-size:9px; letter-spacing:.4px; padding:1px 5px; white-space:nowrap;
+    font-variant-numeric:tabular-nums; }
+
+  /* ════════════════════════════════════════════════════════════════
+     AI KITCHEN CO-PILOT — Preview window, pixel kitchen, chat + chips
+     ════════════════════════════════════════════════════════════════ */
+  .kit{ width:300px; }
+  .kit .body{ background:#fff; padding:13px 13px 15px; }
+  .kit .h{ font-size:18px; letter-spacing:-.4px; color:#1f1f1f; margin:2px 2px 11px; }
+  .kit .scene{ width:100%; display:block; border-radius:7px; image-rendering:pixelated; border:1px solid #e6e6e9; }
+  .kit .chat{ display:flex; flex-direction:column; gap:8px; margin-top:13px; }
+  .kit .bub{ max-width:90%; font-size:12px; line-height:1.32; padding:8px 11px; border-radius:12px; color:#1a1a1a; }
+  .kit .bub.user{ align-self:flex-end; background:#d9d9d9; border-bottom-right-radius:3px; }
+  .kit .bub.ai{ align-self:flex-start; background:#f1f1f1; border-bottom-left-radius:3px; }
+  .kit .bub.ai .caret{ display:inline-block; width:2px; height:1em; vertical-align:-2px; background:#1a1a1a;
+    margin-left:1px; animation:blink 1s steps(1) infinite; }
+  .kit .chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:3px; }
+  .kit .chip{ font-size:11.5px; color:#23408a; background:#eaf1ff; border:1px solid #cfe0ff; cursor:pointer;
+    padding:6px 11px; border-radius:999px; opacity:0; transform:translateY(6px);
+    transition:opacity .35s, transform .35s var(--spring), background .2s; }
+  .kit .chip.in{ opacity:1; transform:none; }
+  .kit .chip:hover{ background:#dbe8ff; }
+  .kit .chip:active{ transform:scale(.95); }
+
+  /* ════════════════════════════════════════════════════════════════
+     AUTOMATION FLOW — white canvas; nodes reveal & connect left→right,
+     packets stream along the wired edges. Loops.
+     ════════════════════════════════════════════════════════════════ */
+  /* matches Figma node 1962:115 "Approval Automation Flow" (1015×516 design space) */
+  .auto{ width:100%; max-width:1015px; aspect-ratio:1015/516; position:relative;
+    background:#fff; border-radius:22px; border:1px solid #e4e4e8; overflow:hidden; }
+  .auto .au-title{ position:absolute; left:6.3%; top:9.9%; transform:translateY(-50%);
+    font-size:clamp(18px,2.7vw,28px); font-weight:600; letter-spacing:-.6px; color:#1c1e26; z-index:4; }
+  .auto .au-replay{ position:absolute; right:14px; top:14px; z-index:5; cursor:pointer; font-size:13px;
+    color:#3a5bff; border:1px solid #dbe2fb; border-radius:8px; padding:5px 9px; background:#f6f8ff;
+    line-height:1; transition:background .2s; }
+  .auto .au-replay:hover{ background:#e9f0ff; }
+  .auto .canvas{ position:absolute; inset:0; }
+  .auto svg.edges{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  .auto svg.edges path.wire{ fill:none; stroke:#d2d6e2; stroke-width:1.8; stroke-linecap:round; }
+  .auto svg.edges path.flow{ fill:none; stroke:#3a5bff; stroke-width:1.8; stroke-linecap:round;
+    filter:drop-shadow(0 0 3px rgba(58,91,255,.5)); }
+  .auto svg.edges circle.packet{ fill:#3a5bff; filter:drop-shadow(0 0 5px rgba(58,91,255,.9)); opacity:0; }
+  .auto .node{ position:absolute; display:flex; align-items:center; gap:11px;
+    background:#fff; border:1px solid #e9e9ee; border-radius:14px; padding:0 16px 0 8px;
+    box-shadow:0 4px 13px rgba(20,30,70,.07);
+    opacity:0; transform:translateY(9px) scale(.96);
+    transition:opacity .42s var(--soft), transform .5s var(--spring); }
+  .auto .node.show{ opacity:1; transform:none; }
+  .auto .node .ico{ width:41px; height:41px; flex:none; border-radius:11px; background:var(--tint,#eef2ff);
+    display:flex; align-items:center; justify-content:center; }
+  .auto .node .ico svg{ width:25px; height:25px; display:block; }
+  .auto .node .lbl{ font-size:14px; font-weight:450; color:#1c1e26; letter-spacing:-.2px; white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<header class="page">
+  <div class="kicker"><span class="ld"></span>BrainOS · interaction windows</div>
+  <h1>Panel workbench</h1>
+  <p>Every pop-up window destined for the brain, built &amp; tuned in isolation here. Grouped under the folder
+     it belongs to. Once these feel right, they get wired into <code>index.html</code> (open-on-folder-click).</p>
+</header>
+
+<main>
+
+  <!-- ══════════════ 1 · IDEAS AT 2 AM ══════════════ -->
+  <section class="folder-sec">
+    <div class="folder-head">
+      <img src="assets/ideasAt2amFolder.png" alt="Ideas at 2 AM folder">
+      <div>
+        <div class="ttl">Ideas at 2 AM</div>
+        <div class="sub">left hemisphere · folder 01</div>
+      </div>
+      <span class="count">3 windows</span>
+    </div>
+    <div class="stages">
+
+      <div class="stage">
+        <div class="platform">
+          <!-- Notes Editor 1 — Apple Notes "Ideas" -->
+          <div class="note" data-note="1" style="--w:262px; --t:21%; --l:8.3%; --r:10%; --fs:17px; --lh:1.5; --col:#363636;">
+            <img class="chrome" src="../panels/notesEditor1.webp" alt="Notes editor">
+            <div class="type" style="font-family:var(--sans);"></div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Notes Editor 1</div><div class="tag">typewriter · auto</div></div>
+      </div>
+
+      <div class="stage">
+        <div class="platform">
+          <!-- Captcha — Notes "Draft" + reCAPTCHA -->
+          <div class="mac cap-win">
+            <div class="bar">
+              <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+              <span class="title">Draft</span>
+            </div>
+            <div class="toolbar mono">
+              <span class="glyph">ⓘ</span><span class="glyph">𝐀a</span><span class="glyph">☑</span>
+              <span class="glyph">𝍌</span><span class="glyph" style="margin-left:auto;">⤴</span>
+            </div>
+            <div class="body">
+              <p class="q">Can we use AI to verify the user?</p>
+              <div class="recaptcha" role="checkbox" aria-checked="false" tabindex="0">
+                <div class="checkbox">
+                  <div class="spin"></div>
+                  <div class="tick">
+                    <svg viewBox="0 0 26 26"><path d="M5 13.5 L11 19 L21 7" fill="none" stroke="#1aa85a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                </div>
+                <span class="lbl">I'm not a robot</span>
+                <div class="brand">
+                  <svg class="rc-logo" viewBox="0 0 50 50" aria-hidden="true">
+                    <g fill="none" stroke="#5a8def" stroke-width="4.4" stroke-linecap="round">
+                      <path d="M41 20 A17 17 0 0 0 12 13"/>
+                      <path d="M9 30 A17 17 0 0 0 38 37"/>
+                    </g>
+                    <polygon fill="#5a8def" points="41,11 48,21 37,23"/>
+                    <polygon fill="#5a8def" points="9,39 2,29 13,27"/>
+                  </svg>
+                  <div class="nm">reCAPTCHA</div>
+                  <div class="tos">Privacy · Terms</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Captcha Panel</div><div class="tag">interactive · click to verify</div></div>
+      </div>
+
+      <div class="stage">
+        <div class="platform">
+          <!-- Doc File -->
+          <div class="docfile">
+            <div class="fold"></div>
+            <div class="kind">DOC</div>
+            <div class="fname">what_happens_when_everyone_can_build.txt</div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Doc File</div><div class="tag">static</div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════════ 2 · PRODUCTS TO BUILD ══════════════ -->
+  <section class="folder-sec">
+    <div class="folder-head">
+      <img src="assets/productsToBuildFolder.png" alt="Products to Build folder">
+      <div>
+        <div class="ttl">Products to Build</div>
+        <div class="sub">right hemisphere · folder 02</div>
+      </div>
+      <span class="count">2 windows</span>
+    </div>
+    <div class="stages">
+
+      <div class="stage">
+        <div class="platform">
+          <!-- To-do List -->
+          <div class="todo">
+            <div class="top"><span class="h">To-do List</span><button class="add">+ Add</button></div>
+            <div class="rows">
+              <div class="item"><span class="ic">🔦</span><span class="nm">evals_that_dont_lie.app</span>
+                <span class="ck"><svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18 L20 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+              <div class="item"><span class="ic">🖥️</span><span class="nm">ai_observability_dashboard</span>
+                <span class="ck"><svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18 L20 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+              <div class="item"><span class="ic">⚙️</span><span class="nm">ai_security_firewall</span>
+                <span class="ck"><svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18 L20 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">To-do List</div><div class="tag">interactive · tick / add</div></div>
+      </div>
+
+      <div class="stage">
+        <div class="platform">
+          <!-- Notes Editor 2 — TextEdit "Products to build" -->
+          <div class="note" data-note="2" style="--w:300px; --t:22.8%; --l:9.5%; --r:9%; --fs:13px; --lh:1.4; --col:#111;">
+            <img class="chrome" src="../panels/notesEditor2.webp" alt="Notes editor">
+            <div class="type" style="font-family:Helvetica,Arial,var(--sans);"></div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Notes Editor 2</div><div class="tag">typewriter · auto</div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════════ 3 · THINGS THAT COULD BE AI ══════════════ -->
+  <section class="folder-sec">
+    <div class="folder-head">
+      <img src="assets/thingsThatCouldBeAiFolder.png" alt="Things that could be AI folder">
+      <div>
+        <div class="ttl">Things That Could Be AI</div>
+        <div class="sub">folder 03</div>
+      </div>
+      <span class="count">3 windows</span>
+    </div>
+    <div class="stages">
+
+      <div class="stage">
+        <div class="platform">
+          <!-- Football Tracker -->
+          <div class="mac ft-win">
+            <div class="bar">
+              <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+              <span class="url mono">footballtracker.ai</span>
+            </div>
+            <div class="ft-field">
+              <div class="grid"></div>
+              <div class="rec mono"><span class="dot"></span>REC · TRACKING</div>
+              <svg class="ft-trail"><polyline points=""/></svg>
+              <div class="ft-box"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i><span class="lab">⚽ BALL 0.98</span></div>
+              <div class="ft-ball">⚽️</div>
+              <div class="hint mono">press anywhere to kick →</div>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Football Tracker</div><div class="tag">interactive · press to kick</div></div>
+      </div>
+
+      <div class="stage">
+        <div class="platform">
+          <!-- AI Kitchen Co-Pilot -->
+          <div class="mac kit">
+            <div class="bar">
+              <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+              <span class="title">untitled.jpg<span class="chev">⌄</span></span>
+            </div>
+            <div class="body">
+              <div class="h">AI Kitchen Co-Pilot</div>
+              <img class="scene" src="assets/kitchenScene.png" alt="pixel kitchen">
+              <div class="chat">
+                <div class="bub user">Cook something impressive using only paneer, two onions, and emotional damage.</div>
+                <div class="bub ai" data-ai-line>Okay. Pick an option from the list:</div>
+                <div class="chips"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">AI Kitchen Co-Pilot</div><div class="tag">interactive · pick option</div></div>
+      </div>
+
+      <div class="stage">
+        <div class="platform">
+          <!-- Notes Editor 3 — iOS Notes -->
+          <div class="note" data-note="3" style="--w:300px; --t:30%; --l:5.5%; --r:5%; --fs:17px; --lh:1.32; --col:#363636;">
+            <img class="chrome" src="../panels/notesEditor3.webp" alt="Notes editor">
+            <div class="type" style="font-family:var(--sans);"></div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Notes Editor 3</div><div class="tag">typewriter · auto</div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════════ 4 · AUTOMATIONS ══════════════ -->
+  <section class="folder-sec">
+    <div class="folder-head">
+      <img src="assets/automationsFolder.png" alt="Automations folder">
+      <div>
+        <div class="ttl">Automations</div>
+        <div class="sub">folder 04</div>
+      </div>
+      <span class="count">2 windows</span>
+    </div>
+    <div class="stages">
+
+      <div class="stage full">
+        <div class="platform" style="width:100%; max-width:1015px;">
+          <!-- Automation Flow — "Approval Automation Flow" (Figma node 1962:115) -->
+          <div class="auto">
+            <div class="au-title">Approval Automation Flow</div>
+            <button class="au-replay" title="replay">↺</button>
+            <div class="canvas">
+              <svg class="edges" viewBox="0 0 1015 516" preserveAspectRatio="none"></svg>
+              <!-- nodes injected by JS -->
+            </div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Automation Flow</div><div class="tag">animated · auto-connect L→R</div></div>
+      </div>
+
+      <div class="stage">
+        <div class="platform">
+          <!-- Notes Editor 4 — iOS Notes -->
+          <div class="note" data-note="4" style="--w:340px; --t:17%; --l:7%; --r:7%; --fs:15px; --lh:1.5; --col:#111;">
+            <img class="chrome" src="../panels/notesEditor4.webp" alt="Notes editor">
+            <div class="type" style="font-family:var(--sans);"></div>
+          </div>
+        </div>
+        <div class="cap"><div class="nm">Notes Editor 4</div><div class="tag">typewriter · auto</div></div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   1 · TYPEWRITER  (Notes Editors 1–4)
+   type a note fast → hold 5s → reverse-type it away → next note → loop
+   ════════════════════════════════════════════════════════════════════════ */
+// Content taken verbatim from the Figma artboards (1940:333 / 1940:359 / 1962:109 / 1962:114)
+// so each editor types out exactly what the design shows, holds, erases, repeats.
+const NOTES = {
+  1: [ // Ideas at 2 AM — Apple Notes "Ideas" (node 1940:333)
+    "•  Voice notes transformed into products\n\n•  What if AI had memory but for design\n\n•  Personalised UI for coders?"
+  ],
+  2: [ // Products to Build — TextEdit doc (node 1940:359)
+    "memory_manager_for_agents.mem\n\nA product that helps AI agents remember the right things and forget the wrong things.\n\nIt manages:\n•  long-term memory\n•  short-term context\n•  user preferences\n•  sensitive data\n•  stale memory\n•  conflicting facts\n\nPlan: Launch date to be decided"
+  ],
+  3: [ // Things That Could Be AI — iOS Notes (node 1962:109)
+    "•  Recycle Bin App\n•  The Financial Chaperone\n•  Sleep-Deprivation Engine\n•  Email Spam Filter\n•  Mind-Reader"
+  ],
+  4: [ // Automations — iOS Notes (node 1962:114)
+    "What all can be automated?\n\n•  Email reply drafts\n•  Database Migration Reviews\n•  Calendar management\n•  File renaming and organisation\n•  Raising support tickets\n•  Analysing logs"
+  ]
+};
+function typewriter(el, notes, {type=30, erase=14, hold=5000, gap=550}={}){
+  const text = document.createTextNode("");
+  const caret = document.createElement("span"); caret.className = "caret";
+  el.append(text, caret);
+  let n = 0;
+  const jitter = () => type * (0.5 + Math.random());
+  (function typeNote(){
+    const s = notes[n]; let i = 0;
+    (function step(){
+      text.nodeValue = s.slice(0, i);
+      if (i++ <= s.length) setTimeout(step, jitter());
+      else setTimeout(eraseNote, hold);
+    })();
+  })();
+  function eraseNote(){
+    const s = text.nodeValue; let i = s.length;
+    (function step(){
+      text.nodeValue = s.slice(0, i);
+      if (i-- > 0) setTimeout(step, erase);
+      else { n = (n + 1) % notes.length; setTimeout(typeNoteAgain, gap); }
+    })();
+  }
+  function typeNoteAgain(){
+    const s = notes[n]; let i = 0;
+    (function step(){
+      text.nodeValue = s.slice(0, i);
+      if (i++ <= s.length) setTimeout(step, jitter());
+      else setTimeout(eraseNote, hold);
+    })();
+  }
+}
+document.querySelectorAll('.note').forEach(note => {
+  const which = note.dataset.note;
+  typewriter(note.querySelector('.type'), NOTES[which]);
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+   2 · CAPTCHA  — click box → spinner → green tick (click again to reset)
+   ════════════════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.recaptcha').forEach(rc => {
+  const box = rc.querySelector('.checkbox');
+  let state = 'idle'; // idle | checking | done
+  function toggle(){
+    if (state === 'checking') return;
+    if (state === 'done'){ rc.classList.remove('done'); rc.setAttribute('aria-checked','false'); state='idle'; return; }
+    state = 'checking'; rc.classList.add('checking');
+    setTimeout(() => {
+      rc.classList.remove('checking'); rc.classList.add('done');
+      rc.setAttribute('aria-checked','true'); state='done';
+    }, 750);
+  }
+  box.addEventListener('click', toggle);
+  rc.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggle(); } });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+   3 · TO-DO LIST — tick rows, "+ Add" inserts a random product idea
+   ════════════════════════════════════════════════════════════════════════ */
+(function todoInit(){
+  const todo = document.querySelector('.todo');
+  if (!todo) return;
+  const rows = todo.querySelector('.rows');
+  const checkSVG = '<svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18 L20 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const pool = [
+    ['🧠','context_window_compressor'], ['🪄','prompt_autocomplete.dev'], ['🛰️','agent_fleet_orchestrator'],
+    ['🔐','llm_secrets_scanner'], ['📊','token_cost_tracker'], ['🧩','tool_router_for_agents'],
+    ['🎛️','model_ab_test_harness'], ['🗂️','rag_that_actually_works'], ['🔁','self_healing_pipelines']
+  ];
+  const MAX = 5;                         // never hold more than 5 todos
+  let p = 0;
+  const addBtn = todo.querySelector('.add');
+  function count(){ return rows.querySelectorAll('.item:not(.removing)').length; }
+  function bind(item){
+    const ck = item.querySelector('.ck');
+    ck.addEventListener('click', () => {
+      if (item.classList.contains('done')) return;   // already cut → ignore
+      item.classList.add('done');                     // tick + strike-through ("cut")
+      setTimeout(() => {                              // …then delete after 2s
+        item.classList.add('removing');
+        setTimeout(() => item.remove(), 420);
+      }, 2000);
+    });
+  }
+  rows.querySelectorAll('.item').forEach(bind);
+  addBtn.addEventListener('click', () => {
+    if (count() >= MAX){                              // at the cap → refuse + nudge
+      addBtn.classList.remove('full'); void addBtn.offsetWidth; addBtn.classList.add('full');
+      return;
+    }
+    const [ic, nm] = pool[p % pool.length]; p++;
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.innerHTML = `<span class="ic">${ic}</span><span class="nm">${nm}</span><span class="ck">${checkSVG}</span>`;
+    rows.appendChild(item); bind(item);
+    item.scrollIntoView({block:'nearest', behavior:'smooth'});
+  });
+})();
+
+/* ════════════════════════════════════════════════════════════════════════
+   4 · FOOTBALL TRACKER — drag & throw; detection box + label + trail follow
+   ════════════════════════════════════════════════════════════════════════ */
+(function footballInit(){
+  const field = document.querySelector('.ft-field');
+  if (!field) return;
+  const ball = field.querySelector('.ft-ball');
+  const box  = field.querySelector('.ft-box');
+  const lab  = field.querySelector('.ft-box .lab');
+  const poly = field.querySelector('.ft-trail polyline');
+  const R = 23, PAD = 14;                          // ball radius, detection-box padding
+  const BASE = 2.7, BOOST = 18, DECAY = 0.975;     // cruise speed · press kick · per-frame boost decay
+  let W = 0, H = 0;
+  function measure(){ const r = field.getBoundingClientRect(); W = r.width; H = r.height; }
+  measure(); window.addEventListener('resize', measure);
+
+  // the ball is ALWAYS in motion; it never comes to rest
+  let x = 120, y = 130, vx = BASE * 0.9, vy = -BASE * 0.6;
+  const trail = [];
+
+  function bounce(){
+    if (x < R){ x = R; vx = Math.abs(vx); }
+    if (x > W - R){ x = W - R; vx = -Math.abs(vx); }
+    if (y < R){ y = R; vy = Math.abs(vy); }
+    if (y > H - R){ y = H - R; vy = -Math.abs(vy); }
+  }
+  // press ANYWHERE on the field → big kick (accelerate a lot); it then decays back to cruise
+  field.addEventListener('pointerdown', () => {
+    let s = Math.hypot(vx, vy); if (s < 0.01){ vx = BASE; vy = 0; s = BASE; }
+    const f = BOOST / s; vx *= f; vy *= f;
+    field.classList.add('kick'); setTimeout(() => field.classList.remove('kick'), 150);
+  });
+
+  function frame(){
+    requestAnimationFrame(frame);
+    if (!W) measure();
+    x += vx; y += vy; bounce();
+    // regulate speed: bleed any kick back down toward BASE, but never below it (keeps it moving)
+    let s = Math.hypot(vx, vy);
+    if (s > BASE + 0.001){ const t = Math.max(BASE, s * DECAY), f = t / s; vx *= f; vy *= f; }
+    else if (s > 0.001 && s < BASE){ const f = BASE / s; vx *= f; vy *= f; }
+    else if (s <= 0.001){ vx = BASE; vy = 0; }
+    // ball
+    ball.style.transform = `translate(${(x - R).toFixed(1)}px, ${(y - R).toFixed(1)}px)`;
+    // detection box locked to the ball
+    const bs = R + PAD;
+    box.style.left = (x - bs) + 'px'; box.style.top = (y - bs) + 'px';
+    box.style.width = box.style.height = (bs * 2) + 'px';
+    // label: "confidence" climbs with speed (so a kick visibly spikes it)
+    const conf = 0.93 + Math.min(0.06, (s - BASE) * 0.006) + Math.random() * 0.005;
+    lab.textContent = `⚽ BALL ${conf.toFixed(2)}`;
+    // dashed tracking trail
+    trail.push(x.toFixed(0) + ',' + y.toFixed(0));
+    if (trail.length > 18) trail.shift();
+    poly.setAttribute('points', trail.join(' '));
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ════════════════════════════════════════════════════════════════════════
+   5 · AI KITCHEN CO-PILOT — type the reply, reveal option chips, pick one
+   ════════════════════════════════════════════════════════════════════════ */
+(function kitchenInit(){
+  const kit = document.querySelector('.kit');
+  if (!kit) return;
+  const aiLine = kit.querySelector('[data-ai-line]');
+  const chipsEl = kit.querySelector('.chips');
+  const baseLine = "Okay. Pick an option from the list:";
+  const options = [
+    { label: "🧀 Paneer of Sorrows",        reply: "Bold. Sear the paneer in regret, deglaze with onion tears. 9/10." },
+    { label: "🧅 Caramelized Despair",       reply: "Low heat, 40 mins, no stirring — just like your weekend. Chef's kiss." },
+    { label: "🔥 Emotional Damage Curry",    reply: "Add the second onion when it hurts the most. Serve immediately." }
+  ];
+  function typeLine(text, done){
+    aiLine.textContent = '';
+    const t = document.createTextNode(''); const c = document.createElement('span'); c.className='caret';
+    aiLine.append(t, c);
+    let i = 0;
+    (function step(){
+      t.nodeValue = text.slice(0, i);
+      if (i++ <= text.length) setTimeout(step, 26);
+      else { c.remove(); done && done(); }
+    })();
+  }
+  function showChips(){
+    chipsEl.innerHTML = '';
+    options.forEach((o, k) => {
+      const c = document.createElement('div'); c.className = 'chip'; c.textContent = o.label;
+      c.addEventListener('click', () => pick(o));
+      chipsEl.appendChild(c);
+      setTimeout(() => c.classList.add('in'), 120 + k * 130);
+    });
+  }
+  function pick(o){
+    [...chipsEl.children].forEach(c => c.classList.remove('in'));   // fade the chips out…
+    setTimeout(() => { chipsEl.innerHTML = ''; }, 340);            // …then drop them so the panel shrinks to fit
+    setTimeout(() => typeLine(o.reply), 260);
+    clearTimeout(resetT);
+    resetT = setTimeout(() => typeLine(baseLine, showChips), 4600); // later: re-ask + bring chips back (panel grows)
+  }
+  let resetT;
+  // kick off
+  typeLine(baseLine, showChips);
+})();
+
+/* ════════════════════════════════════════════════════════════════════════
+   6 · AUTOMATION FLOW — "Approval Automation Flow" (Figma node 1962:115).
+   Form Submission → AI Agent (+ Chat Model / Chat Memory / Entra D tools)
+   → Is Manager? → Add to channel / Update Profile. Nodes reveal & wires draw
+   left→right; packets then stream along the connected edges. Loops.
+   Coordinate space = the design's 1015×516 (the edges-svg viewBox).
+   ════════════════════════════════════════════════════════════════════════ */
+(function automationInit(){
+  const auto = document.querySelector('.auto');
+  if (!auto) return;
+  const canvas = auto.querySelector('.canvas');
+  const svg = auto.querySelector('svg.edges');
+  const VW = 1015, VH = 516, NH = 56.8;   // design space; nodes share it so ports meet wires
+
+  // Phosphor-style line icons, tinted to each node's accent (Slack stays multi-colour)
+  function icon(key, c){
+    const A = `fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"`;
+    switch(key){
+      case 'file':  return `<svg viewBox="0 0 24 24" ${A}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/></svg>`;
+      case 'code':  return `<svg viewBox="0 0 24 24" ${A}><path d="M9.5 8.5 6 12l3.5 3.5"/><path d="M14.5 8.5 18 12l-3.5 3.5"/></svg>`;
+      case 'check': return `<svg viewBox="0 0 24 24" ${A}><circle cx="12" cy="12" r="8.6"/><path d="M8.3 12.4l2.5 2.4 4.9-5.1"/></svg>`;
+      case 'tree':  return `<svg viewBox="0 0 24 24" ${A}><rect x="9" y="3.5" width="6" height="5" rx="1.3"/><rect x="3.5" y="15.5" width="6" height="5" rx="1.3"/><rect x="14.5" y="15.5" width="6" height="5" rx="1.3"/><path d="M12 8.5v2.6M6.5 15.5v-2.4h11v2.4"/></svg>`;
+      case 'db':    return `<svg viewBox="0 0 24 24" ${A}><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.6 3.1 3 7 3s7-1.4 7-3V6"/><path d="M5 12c0 1.6 3.1 3 7 3s7-1.4 7-3"/></svg>`;
+      case 'win':   return `<svg viewBox="0 0 24 24" fill="${c}"><rect x="3.5" y="3.5" width="7.4" height="7.4" rx="1.2"/><rect x="13.1" y="3.5" width="7.4" height="7.4" rx="1.2"/><rect x="3.5" y="13.1" width="7.4" height="7.4" rx="1.2"/><rect x="13.1" y="13.1" width="7.4" height="7.4" rx="1.2"/></svg>`;
+      case 'users': return `<svg viewBox="0 0 24 24" ${A}><circle cx="8" cy="8" r="3.2"/><path d="M2.8 19c0-3 2.3-5.2 5.2-5.2S13.2 16 13.2 19"/><path d="M15.5 9h5.5M15.5 13h5.5M15.5 17h5.5"/></svg>`;
+      case 'slack': return `<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round"><line x1="9" y1="4.5" x2="9" y2="19.5" stroke="#36C5F0"/><line x1="15" y1="4.5" x2="15" y2="19.5" stroke="#2EB67D"/><line x1="4.5" y1="9" x2="19.5" y2="9" stroke="#ECB22E"/><line x1="4.5" y1="15" x2="19.5" y2="15" stroke="#E01E5A"/></svg>`;
+    }
+    return '';
+  }
+
+  // nodes: x,y,w in design units (1015×516). tint = icon-square bg, color = icon stroke.
+  const N = {
+    fs:   { x:64,  y:223, w:200.6, label:'Form Submission', tint:'#e8f8ef', color:'#2bbd6b', icon:'file'  },
+    ai:   { x:339, y:223, w:139.6, label:'AI Agent',        tint:'#efedfe', color:'#7b6ef6', icon:'code'  },
+    im:   { x:554, y:223, w:168.6, label:'Is Manager ?',    tint:'#e8f8ef', color:'#2bbd6b', icon:'check' },
+    cm:   { x:141, y:356, w:161.6, label:'Chat Model',      tint:'#eaf1fe', color:'#4b8cf5', icon:'tree'  },
+    cmem: { x:321, y:356, w:176.6, label:'Chat Memory',     tint:'#eaf1fe', color:'#4b8cf5', icon:'db'    },
+    ed:   { x:512, y:356, w:131.6, label:'Entra D',         tint:'#eaf1fe', color:'#4b8cf5', icon:'win'   },
+    ac:   { x:787, y:163, w:185.6, label:'Add to channel',  tint:'#fff3e0', color:'#e8a33d', icon:'slack' },
+    up:   { x:787, y:289, w:178.6, label:'Update Profile',  tint:'#fff3e0', color:'#e8a33d', icon:'users' }
+  };
+  Object.entries(N).forEach(([id, n]) => {
+    const el = document.createElement('div');
+    el.className = 'node';
+    el.style.left   = (n.x / VW * 100) + '%';
+    el.style.top    = (n.y / VH * 100) + '%';
+    el.style.width  = (n.w / VW * 100) + '%';
+    el.style.height = (NH / VH * 100) + '%';
+    el.innerHTML = `<span class="ico" style="--tint:${n.tint}">${icon(n.icon, n.color)}</span><span class="lbl">${n.label}</span>`;
+    canvas.appendChild(el);
+    n.el = el;
+  });
+
+  // edges: exact paths from the design (curved branches, straight trunk)
+  const EDGES = [
+    { id:'e1', to:'ai',   d:'M 264.6 251.4 L 339 251.4' },                                  // FS → AI
+    { id:'e3', to:'cm',   d:'M 408.8 279.8 C 408.8 322 221.8 314 221.8 356' },               // AI → Chat Model
+    { id:'e4', to:'cmem', d:'M 408.8 279.8 L 409.3 356' },                                   // AI → Chat Memory
+    { id:'e5', to:'ed',   d:'M 408.8 279.8 C 408.8 322 577.8 314 577.8 356' },               // AI → Entra D
+    { id:'e2', to:'im',   d:'M 478.6 251.4 L 554 251.4' },                                   // AI → Is Manager?
+    { id:'e6', to:'ac',   d:'M 722.6 251.4 C 758 251.4 758 191.4 787 191.4' },               // IM → Add to channel
+    { id:'e7', to:'up',   d:'M 722.6 251.4 C 758 251.4 758 317.4 787 317.4' }                // IM → Update Profile
+  ];
+  const wire = {};
+  EDGES.forEach(e => {
+    const w = document.createElementNS(svg.namespaceURI, 'path');
+    w.setAttribute('class', 'wire'); w.setAttribute('d', e.d);
+    const f = document.createElementNS(svg.namespaceURI, 'path');
+    f.setAttribute('class', 'flow'); f.setAttribute('d', e.d);
+    const p = document.createElementNS(svg.namespaceURI, 'circle');
+    p.setAttribute('class', 'packet'); p.setAttribute('r', '3.8');
+    svg.append(w, f, p);
+    const len = f.getTotalLength();
+    f.style.strokeDasharray = w.style.strokeDasharray = len;
+    f.style.strokeDashoffset = w.style.strokeDashoffset = len;
+    wire[e.id] = { w, f, p, len, active:false };
+  });
+
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  function drawWire(id){
+    const e = wire[id];
+    e.w.style.transition = e.f.style.transition = 'stroke-dashoffset .5s ease';
+    requestAnimationFrame(() => { e.w.style.strokeDashoffset = '0'; e.f.style.strokeDashoffset = '0'; });
+    return new Promise(res => setTimeout(() => { e.active = true; res(); }, 520));
+  }
+  function resetAll(){
+    Object.values(wire).forEach(e => {
+      e.active = false; e.w.style.transition = e.f.style.transition = 'none';
+      e.w.style.strokeDashoffset = e.f.style.strokeDashoffset = e.len; e.p.style.opacity = '0';
+    });
+    Object.values(N).forEach(n => n.el.classList.remove('show'));
+  }
+  function show(id){ N[id].el.classList.add('show'); }
+
+  // packets stream along whatever is connected
+  let t0 = performance.now();
+  (function stream(now){
+    requestAnimationFrame(stream);
+    const phase = ((now - t0) % 1500) / 1500;
+    Object.values(wire).forEach((e, i) => {
+      if (!e.active){ e.p.style.opacity = '0'; return; }
+      const t = (phase + i * 0.14) % 1, pt = e.f.getPointAtLength(t * e.len);
+      e.p.setAttribute('cx', pt.x); e.p.setAttribute('cy', pt.y);
+      e.p.style.opacity = Math.sin(t * Math.PI).toFixed(2);
+    });
+  })(t0);
+
+  // generation guard so replay / scroll-trigger / loop never reset each other mid-build
+  let runId = 0;
+  async function run(){
+    const my = ++runId;
+    const alive = async ms => { await wait(ms); return my === runId; };
+    resetAll();
+    if (!(await alive(420))) return;
+    show('fs');                              if (!(await alive(380))) return;
+    await drawWire('e1');                    if (my !== runId) return;   // → AI Agent
+    show('ai');                              if (!(await alive(420))) return;
+    drawWire('e3'); drawWire('e4'); drawWire('e5');                      // AI's tools fan out
+    if (!(await alive(220))) return;
+    show('cm');  if (!(await alive(140))) return;
+    show('cmem');if (!(await alive(140))) return;
+    show('ed');  if (!(await alive(360))) return;
+    await drawWire('e2');                    if (my !== runId) return;   // → Is Manager?
+    show('im');                              if (!(await alive(420))) return;
+    drawWire('e6'); drawWire('e7');                                      // branch to outputs
+    if (!(await alive(220))) return;
+    show('ac');  if (!(await alive(150))) return;
+    show('up');
+    if (!(await alive(4600))) return;
+    run();                                                              // loop
+  }
+  auto.querySelector('.au-replay').addEventListener('click', run);
+
+  // kick off when it scrolls into view (the page is tall)
+  const io = new IntersectionObserver((ents, obs) => {
+    ents.forEach(e => { if (e.isIntersecting){ run(); obs.disconnect(); } });
+  }, { threshold: 0.3 });
+  io.observe(auto);
+})();
+</script>
+</body>
+</html>

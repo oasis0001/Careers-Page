@@ -2058,12 +2058,18 @@
     const SS = 1.5;                                    // supersample (crisp glyphs)
     const RW = Math.round(W * SS), RH = Math.round(H * SS);
     const A_CHARSET  = "Ñ@#W$9876543210?!abc;:+=-,._ ";
-    const A_RES      = 11;                             // glyph cell (readable size, ~7 stage px)
+    const A_RES      = 8;                             // glyph cell (readable size, ~7 stage px)
     const COLS = Math.floor(RW / A_RES), ROWS = Math.floor(RH / A_RES);
-    const A_GAIN     = 4.8;                             // lift the wave body into a continuous glyph surface
+    const A_GAIN     = 3.8;                             // lift the wave body into a continuous glyph surface
     const A_CONTRAST = 1.05, A_THRESH = 1.1, A_NOISE = 14, A_FLOOR = 4;
     const A_TINT     = { r: 235, g: 240, b: 248 };     // near-white, matches the wave
     const A_FPS      = 40;                              // render + dither refresh cap
+
+    // --- Audio reactivity knobs (higher = the wave reacts harder to sound) ---
+    const AUDIO_RIPPLE = 18.0;   // freq-driven ripple height        (orig 8)
+    const AUDIO_LEVEL  = 22.0;   // extra ripple from overall volume (orig 10)
+    const AUDIO_BASS   = 12.0;   // bass "punch" lifting the surface (orig 5)
+    const AUDIO_SWELL  = 0.8;    // whole-surface swell with volume  (orig 0.35)
 
     let renderer, scene, camera, points, uniforms, audioTex;
     let dctx, asciiBuf, asciiCtx, lastAscii = 0;
@@ -2105,6 +2111,10 @@
       uniform sampler2D uAudioTex;
       uniform float uLevel;
       uniform float uBass;
+      uniform float uRippleAmp;
+      uniform float uLevelAmp;
+      uniform float uBassAmp;
+      uniform float uSwell;
       uniform float uSpanZ;
       uniform float uSpanX;
       uniform float uFocus;
@@ -2132,8 +2142,8 @@
 
         float zN = clamp((position.z + uSpanZ * 0.5) / uSpanZ, 0.0, 1.0);
         float frontFlat = smoothstep(1.0, 0.78, zN);
-        float midBand = smoothstep(0.30, 0.48, zN) * smoothstep(0.80, 0.60, zN);
-        float centerX = smoothstep(0.40, 0.12, abs(position.x) / uSpanX);
+        float midBand = smoothstep(0.22, 0.42, zN) * smoothstep(0.90, 0.55, zN);
+        float centerX = smoothstep(0.55, 0.06, abs(position.x) / uSpanX);
         midBand *= centerX;
 
         float h = 0.0;
@@ -2149,12 +2159,12 @@
         float fi = fract(radial * 1.6 + aRand * 0.04);
         float freq = texture2D(uAudioTex, vec2(fi, 0.5)).r;
 
-        float audioRipple = freq * (8.0 + uLevel * 10.0);
+        float audioRipple = freq * (uRippleAmp + uLevel * uLevelAmp);
         audioRipple *= 0.6 + 0.4 * sin(radial * 28.0 - t * 3.0);
-        float audio = (uBass * 5.0 + audioRipple) * midBand;
+        float audio = (uBass * uBassAmp + audioRipple) * midBand;
 
         h += audio;
-        h *= (1.0 + uLevel * 0.35 * midBand);
+        h *= (1.0 + uLevel * uSwell * midBand);
 
         p.y = h;
 
@@ -2252,6 +2262,10 @@
         uAudioTex:   { value: audioTex },
         uLevel:      { value: 0 },
         uBass:       { value: 0 },
+        uRippleAmp:  { value: AUDIO_RIPPLE },
+        uLevelAmp:   { value: AUDIO_LEVEL },
+        uBassAmp:    { value: AUDIO_BASS },
+        uSwell:      { value: AUDIO_SWELL },
         uSpanZ:      { value: SPAN_Z },
         uSpanX:      { value: SPAN_X },
         uFocus:      { value: 95 },
