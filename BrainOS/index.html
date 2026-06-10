@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>BrainOS — Inside an AI Nerd's Mind</title>
+<!-- dot-matrix display font for the TOKENS panel title (falls back to monospace if offline) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitcount+Single&display=swap" rel="stylesheet">
 <!--
   BrainOS. The ASCII brain core is pulled DIRECTLY from dither_brain.html
   (that file is left untouched): exact rendering, sizing, OrbitControls
@@ -24,6 +28,8 @@
     --panel:#0c0d12; --panel-2:#101218; --border:#1c1d26; --border-hot:#2c3350;
     --blue:#6b9bff; --blue-soft:#8fb0ff; --green:#3dffa3;
     --ease-spring:cubic-bezier(.16,1.3,.3,1); --ease-soft:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Monaco,"Cascadia Code",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;}
@@ -91,9 +97,12 @@
   .term-on .card{ box-shadow:0 0 0 1px rgba(61,255,163,.35), 0 0 50px rgba(61,255,163,.18), 0 26px 70px rgba(0,0,0,.6);}
 
   /* folders — glassy icons exported from Figma (label + glow baked in, transparent bg) */
+  /* NB: scoped to `> img` (the folder's OWN icon) so these never leak onto panel images
+     nested inside an opened folder (e.g. the Notes editor chrome). */
   .folder{ width:152px; cursor:pointer; user-select:none; }
-  .folder img{ width:152px; display:block; filter:drop-shadow(0 14px 24px rgba(0,0,0,.4)); transition:transform .5s var(--ease-spring); }
-  .folder:hover img{ transform:translateY(-6px) scale(1.05); }
+  .folder > img{ width:152px; display:block; position:relative; z-index:3;   /* icon sits in front; opened panels rise from behind it */
+    filter:drop-shadow(0 14px 24px rgba(0,0,0,.4)); transition:transform .45s var(--ease-spring); }
+  .folder > img:hover{ transform:translateY(-5px) scale(1.07); }   /* hover the folder → it scales up a bit */
 
   /* shared macOS-window chrome for the Figma panels */
   .win{ border:1px solid #5c5c5c; border-radius:14px; overflow:hidden;
@@ -169,6 +178,29 @@
   .pod .wave i{ width:3px; background:#d9d9d9; border-radius:2px; height:18%; }
   .pod .snip{ font-size:10px; color:#c8c8c8; margin-top:6px; font-style:italic; transition:opacity .3s; }
 
+  /* TOKENS — usage/spend meter (Figma): black card, dot-matrix title, dotted spend bar, DETAILS pill */
+  .tokens{ width:300px; }
+  .tokens .tcard{ background:#000; border:1px solid rgba(255,255,255,.12); border-radius:12px;
+    box-shadow:0 16px 46px rgba(0,0,0,.7); padding:15px 17px 14px;
+    transition:border-color .4s, box-shadow .4s; }
+  .panel:hover .tokens .tcard{ border-color:rgba(255,255,255,.28);
+    box-shadow:0 0 0 1px rgba(255,255,255,.12), 0 0 34px rgba(255,255,255,.08), 0 22px 60px rgba(0,0,0,.65); }
+  .tokens .ttitle{ font-family:'Bitcount Single',ui-monospace,"SF Mono",monospace; font-size:21px;
+    color:#fff; line-height:1; letter-spacing:-0.4px; }
+  .tokens .trow{ display:flex; justify-content:space-between; font-size:11px; color:#bfbfbf;
+    letter-spacing:-0.3px; margin-top:13px; font-variant-numeric:tabular-nums; }
+  .tokens .tbar{ display:flex; gap:2px; margin-top:11px; }
+  .tokens .tcol{ flex:1; display:flex; flex-direction:column; gap:2px; }
+  .tokens .tdot{ height:3px; border-radius:1px; background:#fff; }
+  .tokens .tdot.off{ background:#737373; }
+  .tokens .tcol.lead .tdot{ animation:tokpulse 1.4s ease-in-out infinite; }
+  @keyframes tokpulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .tokens .tfoot{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; }
+  .tokens .twarn{ font-size:10.5px; color:#bfbfbf; line-height:1.25; max-width:152px; letter-spacing:-0.2px; }
+  .tokens .tbtn{ background:#d4d4d4; color:#000; font-size:11px; font-weight:500; border-radius:9px;
+    padding:6px 16px; white-space:nowrap; transition:background .3s, transform .3s var(--ease-spring); }
+  .panel:hover .tokens .tbtn{ background:#fff; transform:translateY(-1px); }
+
 
   /* macOS "fan" files — children of the folder that rise UP out of it in an arc */
   .fanfile{ position:absolute; left:50%; top:30px;      /* start at the folder's paper slot, inside it */
@@ -184,6 +216,199 @@
   .fanfile .ic{ position:absolute; top:9px; left:13px; font-size:14px; color:#5b8cff; }
   .fanfile.page .ic{ color:#8a6bff; }
 
+  /* ════════════════════════════════════════════════════════════════════
+     "IDEAS AT 2 AM" — opened panels (Notes · Captcha · Doc).
+     Ported from BrainOS/interactions.html. Each opened panel is a CHILD of the
+     folder, so it orbits / scales / occludes WITH the brain. ".openpanel" is the
+     positioning + rise-out-of-folder emergence wrapper; the panel chrome below
+     (.note / .cap-win / .docfile) renders at its natural size and is shrunk by
+     the wrapper's scale() to the Figma proportions.
+     ════════════════════════════════════════════════════════════════════ */
+  .openpanel{ position:absolute; left:50%; top:50%; z-index:1;
+    transform-origin:center center; transform:translate(-50%,-50%) scale(.18); opacity:0;
+    pointer-events:auto; will-change:transform,opacity;
+    transition:transform .62s var(--ease-spring), opacity .42s ease; }
+
+  /* shared macOS window chrome (light) */
+  .mac{ border-radius:13px; overflow:hidden; background:#fff; border:1px solid rgba(0,0,0,.14);
+    box-shadow:0 18px 40px rgba(0,0,0,.5); }
+  .mac .bar{ position:relative; height:30px; display:flex; align-items:center; padding:0 12px; gap:8px;
+    background:linear-gradient(#f3f3f4,#e3e3e5); border-bottom:1px solid #d2d2d6; }
+  .mac .bar .lights{ display:flex; gap:7px; }
+  .mac .bar .lights i{ width:11px;height:11px;border-radius:50%; }
+  .mac .bar .lights .r{ background:#ff5f56;} .mac .bar .lights .y{ background:#febc2e;} .mac .bar .lights .g{ background:#28c840;}
+  /* display:block / text-transform:none / letter-spacing:0 explicitly override the page's bare
+     `.title` rule (uppercase + letter-spacing + display:flex), which would otherwise leak in and
+     left-align this centred window title so it collides with the traffic-light buttons. */
+  .mac .bar .title{ position:absolute; left:0; right:0; display:block; text-align:center;
+    font-size:12px; color:#4f4f56; font-weight:500; letter-spacing:0; text-transform:none;
+    white-space:nowrap; pointer-events:none; }
+
+  /* Notes editor — HD chrome bg + live typewriter overlay */
+  .note{ position:relative; width:var(--w); border-radius:12px; overflow:hidden; box-shadow:0 18px 40px rgba(0,0,0,.5); }
+  .note img.chrome{ display:block; width:100%; height:auto; user-select:none; -webkit-user-drag:none; }
+  .note .type{ position:absolute; top:var(--t); left:var(--l); right:var(--r); bottom:6%;
+    white-space:pre-wrap; word-break:break-word; overflow:hidden;
+    font-size:var(--fs); line-height:var(--lh,1.45); color:var(--col,#26262a); }
+  .note .type .caret{ display:inline-block; width:2px; height:1.05em; vertical-align:-2px;
+    background:currentColor; margin-left:1px; animation:blink 1s steps(1) infinite; }
+
+  /* Captcha — Apple-Notes "Draft" window + interactive reCAPTCHA */
+  .cap-win{ width:300px; }
+  .cap-win .toolbar{ display:flex; align-items:center; gap:14px; padding:7px 14px; background:#faf6f5;
+    border-bottom:1px solid #ece4e2; color:#b9b1af; font-size:13px; font-family:var(--mono); }
+  .cap-win .toolbar .glyph{ opacity:.75; }
+  .cap-win .body{ background:#fff; padding:22px 22px 26px; }
+  .cap-win .q{ font-size:21px; line-height:1.12; letter-spacing:-.4px; color:#161616; font-weight:450; margin:0 0 22px; }
+  .recaptcha{ display:flex; align-items:center; gap:12px; width:100%; max-width:256px;
+    border:1px solid #d3d3d3; border-radius:4px; background:#f9f9f9; padding:11px 13px;
+    box-shadow:0 1px 2px rgba(0,0,0,.08); user-select:none; }
+  .recaptcha .checkbox{ width:26px; height:26px; flex:none; border:2px solid #c1c1c1; border-radius:3px;
+    background:#fff; cursor:pointer; position:relative; transition:border-color .2s; }
+  .recaptcha .checkbox:hover{ border-color:#a4a4a4; }
+  .recaptcha .checkbox .spin{ position:absolute; inset:1px; border:3px solid #d9d9d9; border-top-color:#4a90d9;
+    border-radius:50%; opacity:0; animation:rcspin .7s linear infinite; }
+  .recaptcha .checkbox .tick{ position:absolute; inset:0; opacity:0; transform:scale(.4);
+    transition:opacity .25s, transform .35s var(--ease-spring); }
+  .recaptcha .checkbox .tick svg{ width:100%; height:100%; }
+  .recaptcha.checking .checkbox{ border-color:transparent; }
+  .recaptcha.checking .checkbox .spin{ opacity:1; }
+  .recaptcha.done .checkbox{ border-color:transparent; }
+  .recaptcha.done .checkbox .tick{ opacity:1; transform:scale(1); }
+  @keyframes rcspin{to{transform:rotate(360deg);}}
+  .recaptcha .lbl{ font-size:14px; color:#3c3c3c; font-family:var(--sans); }
+  .recaptcha .brand{ margin-left:auto; text-align:center; color:#9b9b9b; }
+  .recaptcha .brand .rc-logo{ width:30px; height:30px; display:block; margin:0 auto; }
+  .recaptcha .brand .nm{ font-size:9px; letter-spacing:.2px; }
+  .recaptcha .brand .tos{ font-size:7px; }
+
+  /* Doc File — folded-corner document icon */
+  .docfile{ width:180px; height:243px; position:relative; cursor:default;
+    background:linear-gradient(150deg,#ffffff 60%,#e6e6e9);
+    border-radius:11px; border-bottom-right-radius:11px;
+    box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.05);
+    clip-path:polygon(0 0, calc(100% - 38px) 0, 100% 38px, 100% 100%, 0 100%); }
+  .docfile .fold{ position:absolute; top:0; right:0; width:38px; height:38px;
+    background:linear-gradient(225deg,#cfcfd4,#fbfbfc); border-bottom-left-radius:7px;
+    box-shadow:-2px 2px 5px rgba(0,0,0,.12); }
+  .docfile .kind{ position:absolute; top:18px; left:14px; font-weight:700; font-size:27px;
+    letter-spacing:-.5px; color:#9a9a9f; }
+  .docfile .fname{ position:absolute; left:13px; right:13px; bottom:16px; font-size:15px; line-height:.95;
+    letter-spacing:-.4px; color:#141414; word-break:break-word; }
+
+  /* To-do List — white card, tickable rows, "+ Add" inserts a new idea */
+  .todo{ width:330px; padding:18px 16px 18px; border-radius:11px;
+    background:linear-gradient(#ffffff 74%,#e9e9ec); border:1px solid #c9c9cf;
+    box-shadow:0 18px 40px rgba(0,0,0,.5); }
+  .todo .top{ display:flex; align-items:center; margin-bottom:16px; }
+  .todo .top .h{ font-size:22px; font-weight:550; letter-spacing:-.7px; color:#0c0c0c; }
+  .todo .top .add{ margin-left:auto; background:#b4cdfd; color:#13213f; border:none; cursor:pointer;
+    font-family:var(--sans); font-size:15px; font-weight:600; letter-spacing:-.3px;
+    padding:7px 14px; border-radius:7px; transition:transform .2s, background .2s; }
+  .todo .top .add:hover{ background:#9dbcfb; } .todo .top .add:active{ transform:scale(.95); }
+  .todo .rows{ display:flex; flex-direction:column; gap:10px; }
+  .todo .item{ display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #111;
+    border-radius:9px; padding:11px 12px; overflow:hidden; max-height:90px;
+    animation:itemIn .45s var(--ease-spring) both;
+    transition:max-height .4s var(--ease-soft), opacity .32s ease, padding .4s var(--ease-soft),
+               margin .4s var(--ease-soft), transform .4s var(--ease-soft), border-color .3s; }
+  @keyframes itemIn{from{opacity:0; transform:translateY(-8px) scale(.97);}}
+  .todo .item.removing{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; margin-top:-10px;
+    transform:scale(.96); border-color:transparent; }
+  .todo .top .add.full{ animation:shake .34s; }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+  .todo .item .ic{ font-size:21px; flex:none; width:24px; text-align:center; }
+  .todo .item .nm{ flex:1; font-size:14px; color:#111; letter-spacing:-.2px; transition:color .25s; }
+  .todo .item .ck{ width:30px; height:30px; flex:none; border:1.4px solid #111; border-radius:6px;
+    cursor:pointer; position:relative; transition:background .2s, border-color .2s; }
+  .todo .item .ck svg{ position:absolute; inset:3px; opacity:0; transform:scale(.4);
+    transition:opacity .2s, transform .3s var(--ease-spring); }
+  .todo .item.done .ck{ background:#1b8f4d; border-color:#1b8f4d; }
+  .todo .item.done .ck svg{ opacity:1; transform:scale(1); }
+  .todo .item.done .nm{ color:#9a9a9a; text-decoration:line-through; }
+
+  /* shared mac title chevron (e.g. AI Kitchen Co-Pilot's "untitled.html ⌄") */
+  .mac .bar .title .chev{ color:#9a9aa2; margin-left:5px; font-size:10px; }
+
+  /* Football Tracker — Safari window; press to kick, detection box + label + dashed trail follow the ball */
+  .ft-win{ width:400px; }
+  .ft-win .bar .url{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:#fff; border:1px solid #d6d6da; border-radius:7px; font-size:11px; color:#5a5a62;
+    padding:3px 16px; min-width:190px; text-align:center; }
+  .ft-field{ position:relative; height:262px; overflow:hidden; cursor:pointer;
+    background:radial-gradient(120% 80% at 50% 0%, #fcfdff, #eef1f7); touch-action:none; }
+  .ft-field.kick .ft-box{ box-shadow:0 0 0 2px rgba(27,77,255,.55), 0 0 22px rgba(27,77,255,.5); }
+  .ft-field .grid{ position:absolute; inset:0; opacity:.5;
+    background-image:linear-gradient(rgba(120,140,200,.10) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(120,140,200,.10) 1px,transparent 1px);
+    background-size:26px 26px; }
+  .ft-field .rec{ position:absolute; top:9px; right:11px; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:1px; color:#d23b3b; display:flex; align-items:center; gap:5px; }
+  .ft-field .rec .dot{ width:7px;height:7px;border-radius:50%; background:#e23b3b; animation:pulse 1.2s infinite; }
+  .ft-field .hint{ position:absolute; bottom:9px; left:11px; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:.6px; color:#9aa0b4; }
+  .ft-trail{ position:absolute; inset:0; pointer-events:none; }
+  .ft-trail polyline{ fill:none; stroke:#1b4dff; stroke-width:1.6; stroke-linecap:round; stroke-dasharray:2 5; opacity:.55; }
+  .ft-ball{ position:absolute; left:0; top:0; width:46px; height:46px; font-size:40px; line-height:46px;
+    text-align:center; will-change:transform; pointer-events:none; user-select:none; z-index:3; }
+  .ft-box{ position:absolute; left:0; top:0; border:1.4px solid #1b4dff; pointer-events:none; z-index:2;
+    box-shadow:0 0 0 1px rgba(27,77,255,.12), 0 0 14px rgba(27,77,255,.25); }
+  .ft-box i{ position:absolute; width:8px; height:8px; border:1.6px solid #1b4dff; }
+  .ft-box i.tl{ left:-1px; top:-1px; border-right:none; border-bottom:none; }
+  .ft-box i.tr{ right:-1px; top:-1px; border-left:none; border-bottom:none; }
+  .ft-box i.bl{ left:-1px; bottom:-1px; border-right:none; border-top:none; }
+  .ft-box i.br{ right:-1px; bottom:-1px; border-left:none; border-top:none; }
+  .ft-box .lab{ position:absolute; left:-1px; top:-17px; background:#1b4dff; color:#fff;
+    font-family:var(--mono); font-size:9px; letter-spacing:.4px; padding:1px 5px; white-space:nowrap;
+    font-variant-numeric:tabular-nums; }
+
+  /* AI Kitchen Co-Pilot — Preview window, pixel kitchen, chat + option chips */
+  .kit{ width:300px; }
+  .kit .body{ background:#fff; padding:13px 13px 15px; }
+  .kit .h{ font-size:18px; letter-spacing:-.4px; color:#1f1f1f; margin:2px 2px 11px; }
+  .kit .scene{ width:100%; display:block; border-radius:7px; image-rendering:pixelated; border:1px solid #e6e6e9; }
+  .kit .chat{ display:flex; flex-direction:column; gap:8px; margin-top:13px; }
+  .kit .bub{ max-width:90%; font-size:12px; line-height:1.32; padding:8px 11px; border-radius:12px; color:#1a1a1a; }
+  .kit .bub.user{ align-self:flex-end; background:#d9d9d9; border-bottom-right-radius:3px; }
+  .kit .bub.ai{ align-self:flex-start; background:#f1f1f1; border-bottom-left-radius:3px; }
+  .kit .bub.ai .caret{ display:inline-block; width:2px; height:1em; vertical-align:-2px; background:#1a1a1a;
+    margin-left:1px; animation:blink 1s steps(1) infinite; }
+  .kit .chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:3px; }
+  .kit .chip{ font-size:11.5px; color:#23408a; background:#eaf1ff; border:1px solid #cfe0ff; cursor:pointer;
+    padding:6px 11px; border-radius:999px; opacity:0; transform:translateY(6px);
+    transition:opacity .35s, transform .35s var(--ease-spring), background .2s; }
+  .kit .chip.in{ opacity:1; transform:none; }
+  .kit .chip:hover{ background:#dbe8ff; }
+  .kit .chip:active{ transform:scale(.95); }
+
+  /* Automation Flow — "Approval Automation Flow" (Figma 1962:115): nodes reveal & wires draw
+     left→right, then blue packets stream along the connected edges. Loops. Rendered at its native
+     1015-px design width (width set inline) so the fixed-px nodes stay correctly proportioned; the
+     wrapper's scale() shrinks the whole thing onto the brain. */
+  .auto{ aspect-ratio:1015/516; position:relative; background:#fff; border-radius:18px;
+    border:1px solid #e4e4e8; overflow:hidden; box-shadow:0 18px 40px rgba(0,0,0,.5); }
+  .auto .au-title{ position:absolute; left:6.3%; top:9.9%; transform:translateY(-50%);
+    font-size:28px; font-weight:600; letter-spacing:-.6px; color:#1c1e26; z-index:4; }
+  .auto .au-replay{ position:absolute; right:14px; top:14px; z-index:5; cursor:pointer; font-size:15px;
+    color:#3a5bff; border:1px solid #dbe2fb; border-radius:8px; padding:6px 10px; background:#f6f8ff;
+    line-height:1; transition:background .2s; }
+  .auto .au-replay:hover{ background:#e9f0ff; }
+  .auto .canvas{ position:absolute; inset:0; }
+  .auto svg.edges{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  .auto svg.edges path.wire{ fill:none; stroke:#d2d6e2; stroke-width:1.8; stroke-linecap:round; }
+  .auto svg.edges path.flow{ fill:none; stroke:#3a5bff; stroke-width:1.8; stroke-linecap:round;
+    filter:drop-shadow(0 0 3px rgba(58,91,255,.5)); }
+  .auto svg.edges circle.packet{ fill:#3a5bff; filter:drop-shadow(0 0 5px rgba(58,91,255,.9)); opacity:0; }
+  .auto .node{ position:absolute; display:flex; align-items:center; gap:11px;
+    background:#fff; border:1px solid #e9e9ee; border-radius:14px; padding:0 16px 0 8px;
+    box-shadow:0 4px 13px rgba(20,30,70,.07);
+    opacity:0; transform:translateY(9px) scale(.96);
+    transition:opacity .42s var(--ease-soft), transform .5s var(--ease-spring); }
+  .auto .node.show{ opacity:1; transform:none; }
+  .auto .node .ico{ width:41px; height:41px; flex:none; border-radius:11px; background:var(--tint,#eef2ff);
+    display:flex; align-items:center; justify-content:center; }
+  .auto .node .ico svg{ width:25px; height:25px; display:block; }
+  .auto .node .lbl{ font-size:14px; font-weight:450; color:#1c1e26; letter-spacing:-.2px; white-space:nowrap; }
 
   /* minimal HUD */
   .hud{ position:fixed; z-index:40; font-size:11px; letter-spacing:.5px; opacity:.85; }
@@ -279,6 +504,16 @@
   const AUTO_ROTATE_SPEED  = 0.8;    // ← idle spin speed. Higher = faster. Set 0 to stop.
   const VERTICAL_LIMIT_DEG = 25;
   const DRAG_SENSITIVITY   = 1.0;
+
+  // ── BRAIN SPIN EASING ──────────────────────────────────────────────
+  // Opening a folder eases the auto-rotation to a firm, slow stop (so its panels
+  // hold still while you read them); closing it eases the spin back up. Multiple
+  // open folders are reference-counted — the brain only resumes once all are shut.
+  const SPIN_TAU = 0.7;                                   // ease time-constant (s) — higher = slower, more deliberate stop
+  let spinCur = AUTO_ROTATE_SPEED, spinTarget = AUTO_ROTATE_SPEED;
+  const _spinHolds = new Set();
+  function brainHold(by){ _spinHolds.add(by); spinTarget = 0; }                       // → ease to a stop
+  function brainRelease(by){ _spinHolds.delete(by); if (!_spinHolds.size) spinTarget = AUTO_ROTATE_SPEED; }  // → ease back up
 
   // ╔═══════════════════════════════════════════════════════════════════╗
   // ║  BRAIN_ZOOM  —  this is the knob to make the brain BIGGER/SMALLER.  ║
@@ -439,6 +674,10 @@
 
     if (isBrainLoaded) {
       brainModel.rotation.set(parseFloat(inputs.tiltX.value), parseFloat(inputs.tiltY.value), parseFloat(inputs.tiltZ.value));
+      // ease the auto-rotation toward its target (0 while a folder is open) for a smooth, firm stop
+      spinCur += (spinTarget - spinCur) * (1 - Math.exp(-dt / SPIN_TAU));
+      if (spinTarget === 0 && spinCur < 0.02) spinCur = 0;   // settle firmly to a full halt
+      controls.autoRotateSpeed = spinCur;
       controls.update(dt);
       updateLightRig();
       updatePanels(dt);                     // ← project the attached manifestations every frame
@@ -607,7 +846,7 @@
   // — so it never reaches, points at, or runs behind a hidden folder.
   const linkSvg  = document.getElementById('folderLinks');
   const SVGNS    = 'http://www.w3.org/2000/svg';
-  const LINK_TAU = 0.12;   // grow/retract easing time constant (s)
+  const LINK_TAU = 0.05;   // grow/retract easing time constant (s) — lower = faster trim animation
   let folderEntries = [], linkEdges = [], linkDefs = null;
   function setupFolderLinks() {
     folderEntries = PANELS.filter(p => p.el.classList.contains('folder'));
@@ -638,12 +877,6 @@
       linkEdges.push({ a, b, ln, r1, r2, grad, s0, s1, p: 0 });
     }
   }
-  // pick the corner of rect nearest to point (tx,ty) → lines attach at folder corners
-  function nearestCorner(rect, tx, ty) {
-    const xs = (tx < rect.left + rect.width / 2) ? rect.left : rect.right;
-    const ys = (ty < rect.top + rect.height / 2) ? rect.top : rect.bottom;
-    return { x: xs, y: ys };
-  }
   function frontness(f) { return THREE.MathUtils.clamp((f + 0.2) / 0.5, 0, 1); }
   function smoothstep(e0, e1, x) { const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
   function drawFolderLinks(dt) {
@@ -669,8 +902,10 @@
 
       const ra = anchorE.el.querySelector('img').getBoundingClientRect();
       const rb = farE.el.querySelector('img').getBoundingClientRect();
-      const A  = nearestCorner(ra, farE._sx, farE._sy);          // bright anchor corner (visible folder)
-      const B  = nearestCorner(rb, anchorE._sx, anchorE._sy);    // far corner (folder it points at)
+      // ONE fixed connection point per folder (top-centre of the card) shared by all of its lines,
+      // so each folder shows a single node — not a separate corner per edge.
+      const A  = { x: ra.left + ra.width * 0.5, y: ra.top + 6 };
+      const B  = { x: rb.left + rb.width * 0.5, y: rb.top + 6 };
       const hx = A.x + (B.x - A.x) * e.p, hy = A.y + (B.y - A.y) * e.p;   // drawn head (grows/retracts)
 
       e.ln.setAttribute('x1', A.x); e.ln.setAttribute('y1', A.y);
@@ -713,6 +948,7 @@
     let open = false; const items = [];
     folderEl.addEventListener('click', () => { open = !open; open ? openFan() : closeFan(); });
     function openFan() {
+      brainHold(folderEl);                          // ease the brain to a firm, slow stop
       files.forEach((txt, k) => {
         const f = document.createElement('div');
         f.className = 'fanfile' + (isPage ? ' page' : '');
@@ -729,6 +965,7 @@
       });
     }
     function closeFan() {
+      brainRelease(folderEl);                       // let the brain ease back into its idle spin
       items.forEach((f, k) => {
         f.style.transitionDelay = ((items.length - k) * 30) + 'ms';   // suck back in, top first
         f.classList.remove('open');
@@ -737,6 +974,483 @@
       });
       items.length = 0;
     }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     "IDEAS AT 2 AM" folder → click opens 3 real interaction panels arranged
+     per Figma (node 1987:210): Notes Editor (upper-left) · Captcha (high
+     centre) · Doc File (upper-right), fanning UP out of the folder. The panels
+     are CHILDREN of the folder element so they travel / scale / occlude with
+     the brain exactly like the folder itself. Click the folder again to close.
+     ════════════════════════════════════════════════════════════════════ */
+  const IDEAS_NOTE = "•  Voice notes transformed into products\n\n•  What if AI had memory but for design\n\n•  Personalised UI for coders?";
+  const PRODUCTS_NOTE = "memory_manager_for_agents.mem\n\nA product that helps AI agents remember the right things and forget the wrong things.\n\nIt manages:\n•  long-term memory\n•  short-term context\n•  user preferences\n•  sensitive data\n•  stale memory\n•  conflicting facts\n\nPlan: Launch date to be decided";
+
+  // Generic folder-panel engine: click the folder icon → fan its SPECS up as children that
+  // orbit / scale / occlude with the brain; click again → collapse them back in. Each spec:
+  // { html, tx, ty, k, delay, init? } where tx/ty are folder-local px offsets of the panel
+  // CENTRE from the folder centre, and k scales the natural chrome to the reference proportions.
+  function fanFolderPanels(folderEl, SPECS) {
+    const img = folderEl.querySelector(':scope > img');
+    let open = false, nodes = [];
+    img.addEventListener('click', () => { open = !open; open ? openPanels() : closePanels(); });
+    function openPanels() {
+      brainHold(folderEl);                                        // ease the brain to a firm, slow stop
+      SPECS.forEach(spec => {
+        const w = document.createElement('div');
+        w.className = 'openpanel'; w.innerHTML = spec.html;
+        w.style.transform = 'translate(-50%,-50%) scale(.18)'; w.style.opacity = '0';
+        folderEl.appendChild(w); nodes.push(w);
+        spec.init && spec.init(w);
+        requestAnimationFrame(() => requestAnimationFrame(() => {   // let initial state paint, then spring out
+          w.style.transitionDelay = spec.delay + 'ms';
+          w.style.transform = `translate(calc(-50% + ${spec.tx}px), calc(-50% + ${spec.ty}px)) scale(${spec.k})`;
+          w.style.opacity = '1';
+        }));
+      });
+    }
+    function closePanels() {
+      brainRelease(folderEl);                                     // let the brain ease back into its idle spin
+      const cur = nodes; nodes = [];
+      cur.forEach((w, k) => {                                      // suck back into the folder, last-out first
+        w.style.transitionDelay = ((cur.length - 1 - k) * 45) + 'ms';
+        w.style.transform = 'translate(-50%,-50%) scale(.18)'; w.style.opacity = '0';
+        setTimeout(() => w.remove(), 720);
+      });
+    }
+  }
+
+  // ── IDEAS AT 2 AM → Notes Editor 1 (upper-left) · Captcha (high centre) · Doc File (upper-right) ──
+  function makeIdeas2amPanels(folderEl) {
+    // tx,ty = offset (folder-local px) of each panel's CENTRE from the folder centre;
+    // k = scale that shrinks the natural-size chrome to the reference proportions. (tunable)
+    const SPECS = [
+      { tx:-181, ty:-101, k:0.68, delay:0,                       // Notes Editor 1 — Apple Notes "Ideas"
+        html:`<div class="note" style="--w:262px; --t:21%; --l:8.3%; --r:10%; --fs:17px; --lh:1.5; --col:#363636;">
+                <img class="chrome" src="../panels/notesEditor1.webp" alt="Notes editor" draggable="false">
+                <div class="type" style="font-family:var(--sans);"></div>
+              </div>`,
+        init: w => typewriter(w.querySelector('.type'), [IDEAS_NOTE]) },
+      { tx:3, ty:-140, k:0.59, delay:80,                         // Captcha — Notes "Draft" + reCAPTCHA
+        html:`<div class="mac cap-win">
+                <div class="bar">
+                  <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+                  <span class="title">Draft</span>
+                </div>
+                <div class="toolbar mono">
+                  <span class="glyph">ⓘ</span><span class="glyph">𝐀a</span><span class="glyph">☑</span>
+                  <span class="glyph">𝍌</span><span class="glyph" style="margin-left:auto;">⤴</span>
+                </div>
+                <div class="body">
+                  <p class="q">Can we use AI to verify the user?</p>
+                  <div class="recaptcha" role="checkbox" aria-checked="false" tabindex="0">
+                    <div class="checkbox">
+                      <div class="spin"></div>
+                      <div class="tick">
+                        <svg viewBox="0 0 26 26"><path d="M5 13.5 L11 19 L21 7" fill="none" stroke="#1aa85a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </div>
+                    </div>
+                    <span class="lbl">I'm not a robot</span>
+                    <div class="brand">
+                      <svg class="rc-logo" viewBox="0 0 50 50" aria-hidden="true">
+                        <g fill="none" stroke="#5a8def" stroke-width="4.4" stroke-linecap="round">
+                          <path d="M41 20 A17 17 0 0 0 12 13"/>
+                          <path d="M9 30 A17 17 0 0 0 38 37"/>
+                        </g>
+                        <polygon fill="#5a8def" points="41,11 48,21 37,23"/>
+                        <polygon fill="#5a8def" points="9,39 2,29 13,27"/>
+                      </svg>
+                      <div class="nm">reCAPTCHA</div>
+                      <div class="tos">Privacy · Terms</div>
+                    </div>
+                  </div>
+                </div>
+              </div>`,
+        init: w => initCaptcha(w.querySelector('.recaptcha')) },
+      { tx:155, ty:-81, k:0.50, delay:160,                       // Doc File
+        html:`<div class="docfile">
+                <div class="fold"></div>
+                <div class="kind">DOC</div>
+                <div class="fname">what_happens_when_everyone_can_build.txt</div>
+              </div>` }
+    ];
+    fanFolderPanels(folderEl, SPECS);
+  }
+
+  // ── PRODUCTS TO BUILD → To-do List (upper-left) · Notes Editor 2 / TextEdit (upper-right) ──
+  function makeProductsBuildPanels(folderEl) {
+    const checkSVG = '<svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18 L20 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const SPECS = [
+      { tx:-118, ty:-128, k:0.52, delay:0,                       // To-do List — tickable rows + "+ Add"
+        html:`<div class="todo">
+                <div class="top"><span class="h">To-do List</span><button class="add">+ Add</button></div>
+                <div class="rows">
+                  <div class="item"><span class="ic">🔦</span><span class="nm">evals_that_dont_lie.app</span><span class="ck">${checkSVG}</span></div>
+                  <div class="item"><span class="ic">🖥️</span><span class="nm">ai_observability_dashboard</span><span class="ck">${checkSVG}</span></div>
+                  <div class="item"><span class="ic">⚙️</span><span class="nm">ai_security_firewall</span><span class="ck">${checkSVG}</span></div>
+                </div>
+              </div>`,
+        init: w => initTodo(w.querySelector('.todo')) },
+      { tx:128, ty:-150, k:0.50, delay:90,                       // Notes Editor 2 — TextEdit "Products to build"
+        html:`<div class="note" style="--w:300px; --t:22.8%; --l:9.5%; --r:9%; --fs:13px; --lh:1.4; --col:#111;">
+                <img class="chrome" src="../panels/notesEditor2.webp" alt="Notes editor" draggable="false">
+                <div class="type" style="font-family:Helvetica,Arial,var(--sans);"></div>
+              </div>`,
+        init: w => typewriter(w.querySelector('.type'), [PRODUCTS_NOTE]) }
+    ];
+    fanFolderPanels(folderEl, SPECS);
+  }
+
+  // To-do List: tick a row → it "cuts" (done) then collapses out after 2s; "+ Add" inserts a
+  // random product idea (cap 5 → button shakes when full). Operates on one .todo root.
+  function initTodo(todo) {
+    if (!todo) return;
+    const rows = todo.querySelector('.rows');
+    const checkSVG = '<svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18 L20 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const pool = [
+      ['🧠','context_window_compressor'], ['🪄','prompt_autocomplete.dev'], ['🛰️','agent_fleet_orchestrator'],
+      ['🔐','llm_secrets_scanner'], ['📊','token_cost_tracker'], ['🧩','tool_router_for_agents'],
+      ['🎛️','model_ab_test_harness'], ['🗂️','rag_that_actually_works'], ['🔁','self_healing_pipelines']
+    ];
+    const MAX = 5; let p = 0;
+    const addBtn = todo.querySelector('.add');
+    const count = () => rows.querySelectorAll('.item:not(.removing)').length;
+    function bind(item) {
+      item.querySelector('.ck').addEventListener('click', () => {
+        if (item.classList.contains('done')) return;             // already cut → ignore
+        item.classList.add('done');                              // tick + strike-through
+        setTimeout(() => { item.classList.add('removing'); setTimeout(() => item.remove(), 420); }, 2000);
+      });
+    }
+    rows.querySelectorAll('.item').forEach(bind);
+    addBtn.addEventListener('click', () => {
+      if (count() >= MAX) { addBtn.classList.remove('full'); void addBtn.offsetWidth; addBtn.classList.add('full'); return; }
+      const [ic, nm] = pool[p % pool.length]; p++;
+      const item = document.createElement('div');
+      item.className = 'item';
+      item.innerHTML = `<span class="ic">${ic}</span><span class="nm">${nm}</span><span class="ck">${checkSVG}</span>`;
+      rows.appendChild(item); bind(item);
+    });
+  }
+
+  // ── THINGS THAT COULD BE AI → Football Tracker (upper-left) · AI Kitchen Co-Pilot (high centre) · Notes Editor 3 (upper-right) ──
+  const THINGS_NOTE = "•  Recycle Bin App\n•  The Financial Chaperone\n•  Sleep-Deprivation Engine\n•  Email Spam Filter\n•  Mind-Reader";
+  function makeThingsAiPanels(folderEl) {
+    const SPECS = [
+      { tx:-175, ty:-120, k:0.46, delay:0,                       // Football Tracker — press to kick
+        html:`<div class="mac ft-win">
+                <div class="bar">
+                  <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+                  <span class="url mono">footballtracker.ai</span>
+                </div>
+                <div class="ft-field">
+                  <div class="grid"></div>
+                  <div class="rec mono"><span class="dot"></span>REC · TRACKING</div>
+                  <svg class="ft-trail"><polyline points=""/></svg>
+                  <div class="ft-box"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i><span class="lab">⚽ BALL 0.98</span></div>
+                  <div class="ft-ball">⚽️</div>
+                  <div class="hint mono">press anywhere to kick →</div>
+                </div>
+              </div>`,
+        init: w => initFootball(w.querySelector('.ft-field')) },
+      { tx:15, ty:-200, k:0.52, delay:90,                        // AI Kitchen Co-Pilot — pick an option (tall → lifted clear of the folder)
+        html:`<div class="mac kit">
+                <div class="bar">
+                  <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+                  <span class="title">untitled.html<span class="chev">⌄</span></span>
+                </div>
+                <div class="body">
+                  <div class="h">AI Kitchen Co-Pilot</div>
+                  <img class="scene" src="assets/kitchenScene.png" alt="pixel kitchen" draggable="false">
+                  <div class="chat">
+                    <div class="bub user">Cook something impressive using only paneer, two onions, and emotional damage.</div>
+                    <div class="bub ai" data-ai-line>Okay. Pick an option from the list:</div>
+                    <div class="chips"></div>
+                  </div>
+                </div>
+              </div>`,
+        init: w => initKitchen(w.querySelector('.kit')) },
+      { tx:180, ty:-95, k:0.54, delay:180,                       // Notes Editor 3 — iOS Notes
+        html:`<div class="note" style="--w:300px; --t:24%; --l:5.5%; --r:5%; --fs:17px; --lh:1.32; --col:#363636;">
+                <img class="chrome" src="../panels/notesEditor3.webp" alt="Notes editor" draggable="false">
+                <div class="type" style="font-family:var(--sans);"></div>
+              </div>`,
+        init: w => typewriter(w.querySelector('.type'), [THINGS_NOTE]) }
+    ];
+    fanFolderPanels(folderEl, SPECS);
+  }
+
+  // Football Tracker: the ball is always in motion (bounces off the walls); press the field to kick
+  // (a big boost that decays back to cruise). The detection box + confidence label + dashed trail stay
+  // locked to it. Measures via offsetWidth/Height (LAYOUT px) so the physics stay correct even though
+  // the panel is CSS-scaled on the brain (getBoundingClientRect would return shrunken, scaled px).
+  function initFootball(field) {
+    if (!field) return;
+    const ball = field.querySelector('.ft-ball');
+    const box  = field.querySelector('.ft-box');
+    const lab  = field.querySelector('.ft-box .lab');
+    const poly = field.querySelector('.ft-trail polyline');
+    const R = 23, PAD = 14, BASE = 2.7, BOOST = 18, DECAY = 0.975;   // radius · box pad · cruise · kick · decay
+    let W = 0, H = 0;
+    const measure = () => { W = field.offsetWidth; H = field.offsetHeight; };
+    measure();
+    let x = 120, y = 130, vx = BASE * 0.9, vy = -BASE * 0.6;
+    const trail = [];
+    function bounce() {
+      if (x < R) { x = R; vx = Math.abs(vx); }  if (x > W - R) { x = W - R; vx = -Math.abs(vx); }
+      if (y < R) { y = R; vy = Math.abs(vy); }  if (y > H - R) { y = H - R; vy = -Math.abs(vy); }
+    }
+    field.addEventListener('pointerdown', () => {                   // press anywhere → big kick
+      let s = Math.hypot(vx, vy); if (s < 0.01) { vx = BASE; vy = 0; s = BASE; }
+      const f = BOOST / s; vx *= f; vy *= f;
+      field.classList.add('kick'); setTimeout(() => field.classList.remove('kick'), 150);
+    });
+    (function frame() {
+      if (!field.isConnected) return;                               // panel closed → stop the loop
+      requestAnimationFrame(frame);
+      if (!W) measure();
+      x += vx; y += vy; bounce();
+      let s = Math.hypot(vx, vy);                                    // bleed kicks back toward BASE, never below
+      if (s > BASE + 0.001) { const t = Math.max(BASE, s * DECAY), f = t / s; vx *= f; vy *= f; }
+      else if (s > 0.001 && s < BASE) { const f = BASE / s; vx *= f; vy *= f; }
+      else if (s <= 0.001) { vx = BASE; vy = 0; }
+      ball.style.transform = `translate(${(x - R).toFixed(1)}px, ${(y - R).toFixed(1)}px)`;
+      const bs = R + PAD;
+      box.style.left = (x - bs) + 'px'; box.style.top = (y - bs) + 'px';
+      box.style.width = box.style.height = (bs * 2) + 'px';
+      const conf = 0.93 + Math.min(0.06, (s - BASE) * 0.006) + Math.random() * 0.005;
+      lab.textContent = `⚽ BALL ${conf.toFixed(2)}`;
+      trail.push(x.toFixed(0) + ',' + y.toFixed(0)); if (trail.length > 18) trail.shift();
+      poly.setAttribute('points', trail.join(' '));
+    })();
+  }
+
+  // AI Kitchen Co-Pilot: type the AI line → reveal option chips → pick one → type the reply → after a
+  // beat, re-ask and bring the chips back. Loops. Steps stop once the panel is removed.
+  function initKitchen(kit) {
+    if (!kit) return;
+    const aiLine = kit.querySelector('[data-ai-line]');
+    const chipsEl = kit.querySelector('.chips');
+    const baseLine = "Okay. Pick an option from the list:";
+    const options = [
+      { label:"🧀 Paneer of Sorrows",      reply:"Bold. Sear the paneer in regret, deglaze with onion tears. 9/10." },
+      { label:"🧅 Caramelized Despair",    reply:"Low heat, 40 mins, no stirring — just like your weekend. Chef's kiss." },
+      { label:"🔥 Emotional Damage Curry", reply:"Add the second onion when it hurts the most. Serve immediately." }
+    ];
+    let resetT;
+    function typeLine(text, done) {
+      aiLine.textContent = '';
+      const t = document.createTextNode(''), c = document.createElement('span'); c.className = 'caret';
+      aiLine.append(t, c);
+      let i = 0;
+      (function step() {
+        if (!kit.isConnected) return;
+        t.nodeValue = text.slice(0, i);
+        if (i++ <= text.length) setTimeout(step, 26);
+        else { c.remove(); done && done(); }
+      })();
+    }
+    function showChips() {
+      chipsEl.innerHTML = '';
+      options.forEach((o, k) => {
+        const c = document.createElement('div'); c.className = 'chip'; c.textContent = o.label;
+        c.addEventListener('click', () => pick(o));
+        chipsEl.appendChild(c);
+        setTimeout(() => c.classList.add('in'), 120 + k * 130);
+      });
+    }
+    function pick(o) {
+      [...chipsEl.children].forEach(c => c.classList.remove('in'));   // fade chips out…
+      setTimeout(() => { chipsEl.innerHTML = ''; }, 340);             // …drop them so the panel shrinks to fit
+      setTimeout(() => typeLine(o.reply), 260);
+      clearTimeout(resetT);
+      resetT = setTimeout(() => typeLine(baseLine, showChips), 4600); // later: re-ask + bring chips back
+    }
+    typeLine(baseLine, showChips);
+  }
+
+  // ── AUTOMATIONS → Automation Flow (upper-left, wide) · Notes Editor 4 / iOS Notes (upper-right) ──
+  const AUTOMATIONS_NOTE = "What all can be automated?\n\n•  Email reply drafts\n•  Database Migration Reviews\n•  Calendar management\n•  File renaming and organisation\n•  Raising support tickets\n•  Analysing logs";
+  function makeAutomationsPanels(folderEl) {
+    const SPECS = [
+      { tx:-100, ty:-155, k:0.37, delay:0,                       // Automation Flow — native 1015px width, scaled down
+        html:`<div class="auto" style="width:1015px;">
+                <div class="au-title">Approval Automation Flow</div>
+                <button class="au-replay" title="replay">↺</button>
+                <div class="canvas">
+                  <svg class="edges" viewBox="0 0 1015 516" preserveAspectRatio="none"></svg>
+                </div>
+              </div>`,
+        init: w => initAutomation(w.querySelector('.auto')) },
+      { tx:195, ty:-122, k:0.48, delay:90,                       // Notes Editor 4 — iOS Notes
+        html:`<div class="note" style="--w:340px; --t:17%; --l:7%; --r:7%; --fs:15px; --lh:1.5; --col:#111;">
+                <img class="chrome" src="../panels/notesEditor4.webp" alt="Notes editor" draggable="false">
+                <div class="type" style="font-family:var(--sans);"></div>
+              </div>`,
+        init: w => typewriter(w.querySelector('.type'), [AUTOMATIONS_NOTE]) }
+    ];
+    fanFolderPanels(folderEl, SPECS);
+  }
+
+  // Automation Flow: reveal nodes & draw wires left→right (Form Submission → AI Agent + tools →
+  // Is Manager? → outputs), then stream packets along the connected edges. Loops. Coordinate space =
+  // the design's 1015×516 (the edges-svg viewBox), so node ports meet the wire paths exactly.
+  function initAutomation(auto) {
+    if (!auto) return;
+    const canvas = auto.querySelector('.canvas');
+    const svg = auto.querySelector('svg.edges');
+    const VW = 1015, VH = 516, NH = 56.8;
+    function icon(key, c) {
+      const A = `fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"`;
+      switch (key) {
+        case 'file':  return `<svg viewBox="0 0 24 24" ${A}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/></svg>`;
+        case 'code':  return `<svg viewBox="0 0 24 24" ${A}><path d="M9.5 8.5 6 12l3.5 3.5"/><path d="M14.5 8.5 18 12l-3.5 3.5"/></svg>`;
+        case 'check': return `<svg viewBox="0 0 24 24" ${A}><circle cx="12" cy="12" r="8.6"/><path d="M8.3 12.4l2.5 2.4 4.9-5.1"/></svg>`;
+        case 'tree':  return `<svg viewBox="0 0 24 24" ${A}><rect x="9" y="3.5" width="6" height="5" rx="1.3"/><rect x="3.5" y="15.5" width="6" height="5" rx="1.3"/><rect x="14.5" y="15.5" width="6" height="5" rx="1.3"/><path d="M12 8.5v2.6M6.5 15.5v-2.4h11v2.4"/></svg>`;
+        case 'db':    return `<svg viewBox="0 0 24 24" ${A}><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.6 3.1 3 7 3s7-1.4 7-3V6"/><path d="M5 12c0 1.6 3.1 3 7 3s7-1.4 7-3"/></svg>`;
+        case 'win':   return `<svg viewBox="0 0 24 24" fill="${c}"><rect x="3.5" y="3.5" width="7.4" height="7.4" rx="1.2"/><rect x="13.1" y="3.5" width="7.4" height="7.4" rx="1.2"/><rect x="3.5" y="13.1" width="7.4" height="7.4" rx="1.2"/><rect x="13.1" y="13.1" width="7.4" height="7.4" rx="1.2"/></svg>`;
+        case 'users': return `<svg viewBox="0 0 24 24" ${A}><circle cx="8" cy="8" r="3.2"/><path d="M2.8 19c0-3 2.3-5.2 5.2-5.2S13.2 16 13.2 19"/><path d="M15.5 9h5.5M15.5 13h5.5M15.5 17h5.5"/></svg>`;
+        case 'slack': return `<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round"><line x1="9" y1="4.5" x2="9" y2="19.5" stroke="#36C5F0"/><line x1="15" y1="4.5" x2="15" y2="19.5" stroke="#2EB67D"/><line x1="4.5" y1="9" x2="19.5" y2="9" stroke="#ECB22E"/><line x1="4.5" y1="15" x2="19.5" y2="15" stroke="#E01E5A"/></svg>`;
+      }
+      return '';
+    }
+    const N = {
+      fs:   { x:64,  y:223, w:200.6, label:'Form Submission', tint:'#e8f8ef', color:'#2bbd6b', icon:'file'  },
+      ai:   { x:339, y:223, w:139.6, label:'AI Agent',        tint:'#efedfe', color:'#7b6ef6', icon:'code'  },
+      im:   { x:554, y:223, w:168.6, label:'Is Manager ?',    tint:'#e8f8ef', color:'#2bbd6b', icon:'check' },
+      cm:   { x:141, y:356, w:161.6, label:'Chat Model',      tint:'#eaf1fe', color:'#4b8cf5', icon:'tree'  },
+      cmem: { x:321, y:356, w:176.6, label:'Chat Memory',     tint:'#eaf1fe', color:'#4b8cf5', icon:'db'    },
+      ed:   { x:512, y:356, w:131.6, label:'Entra D',         tint:'#eaf1fe', color:'#4b8cf5', icon:'win'   },
+      ac:   { x:787, y:163, w:185.6, label:'Add to channel',  tint:'#fff3e0', color:'#e8a33d', icon:'slack' },
+      up:   { x:787, y:289, w:178.6, label:'Update Profile',  tint:'#fff3e0', color:'#e8a33d', icon:'users' }
+    };
+    Object.entries(N).forEach(([id, n]) => {
+      const el = document.createElement('div');
+      el.className = 'node';
+      el.style.left = (n.x / VW * 100) + '%'; el.style.top = (n.y / VH * 100) + '%';
+      el.style.width = (n.w / VW * 100) + '%'; el.style.height = (NH / VH * 100) + '%';
+      el.innerHTML = `<span class="ico" style="--tint:${n.tint}">${icon(n.icon, n.color)}</span><span class="lbl">${n.label}</span>`;
+      canvas.appendChild(el); n.el = el;
+    });
+    const EDGES = [
+      { id:'e1', to:'ai',   d:'M 264.6 251.4 L 339 251.4' },
+      { id:'e3', to:'cm',   d:'M 408.8 279.8 C 408.8 322 221.8 314 221.8 356' },
+      { id:'e4', to:'cmem', d:'M 408.8 279.8 L 409.3 356' },
+      { id:'e5', to:'ed',   d:'M 408.8 279.8 C 408.8 322 577.8 314 577.8 356' },
+      { id:'e2', to:'im',   d:'M 478.6 251.4 L 554 251.4' },
+      { id:'e6', to:'ac',   d:'M 722.6 251.4 C 758 251.4 758 191.4 787 191.4' },
+      { id:'e7', to:'up',   d:'M 722.6 251.4 C 758 251.4 758 317.4 787 317.4' }
+    ];
+    const wire = {};
+    EDGES.forEach(e => {
+      const w = document.createElementNS(svg.namespaceURI, 'path'); w.setAttribute('class', 'wire'); w.setAttribute('d', e.d);
+      const f = document.createElementNS(svg.namespaceURI, 'path'); f.setAttribute('class', 'flow'); f.setAttribute('d', e.d);
+      const p = document.createElementNS(svg.namespaceURI, 'circle'); p.setAttribute('class', 'packet'); p.setAttribute('r', '3.8');
+      svg.append(w, f, p);
+      const len = f.getTotalLength();
+      f.style.strokeDasharray = w.style.strokeDasharray = len;
+      f.style.strokeDashoffset = w.style.strokeDashoffset = len;
+      wire[e.id] = { w, f, p, len, active: false };
+    });
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    function drawWire(id) {
+      const e = wire[id];
+      e.w.style.transition = e.f.style.transition = 'stroke-dashoffset .5s ease';
+      requestAnimationFrame(() => { e.w.style.strokeDashoffset = '0'; e.f.style.strokeDashoffset = '0'; });
+      return new Promise(res => setTimeout(() => { e.active = true; res(); }, 520));
+    }
+    function resetAll() {
+      Object.values(wire).forEach(e => {
+        e.active = false; e.w.style.transition = e.f.style.transition = 'none';
+        e.w.style.strokeDashoffset = e.f.style.strokeDashoffset = e.len; e.p.style.opacity = '0';
+      });
+      Object.values(N).forEach(n => n.el.classList.remove('show'));
+    }
+    function show(id) { N[id].el.classList.add('show'); }
+    let t0 = performance.now();
+    (function stream(now) {
+      if (!auto.isConnected) return;                              // panel closed → stop the loop
+      requestAnimationFrame(stream);
+      const phase = ((now - t0) % 1500) / 1500;
+      Object.values(wire).forEach((e, i) => {
+        if (!e.active) { e.p.style.opacity = '0'; return; }
+        const t = (phase + i * 0.14) % 1, pt = e.f.getPointAtLength(t * e.len);
+        e.p.setAttribute('cx', pt.x); e.p.setAttribute('cy', pt.y);
+        e.p.style.opacity = Math.sin(t * Math.PI).toFixed(2);
+      });
+    })(t0);
+    let runId = 0;
+    async function run() {
+      const my = ++runId;
+      const alive = async ms => { await wait(ms); return my === runId && auto.isConnected; };
+      resetAll();
+      if (!(await alive(420))) return;
+      show('fs');                              if (!(await alive(380))) return;
+      await drawWire('e1');                    if (my !== runId || !auto.isConnected) return;
+      show('ai');                              if (!(await alive(420))) return;
+      drawWire('e3'); drawWire('e4'); drawWire('e5');
+      if (!(await alive(220))) return;
+      show('cm');   if (!(await alive(140))) return;
+      show('cmem'); if (!(await alive(140))) return;
+      show('ed');   if (!(await alive(360))) return;
+      await drawWire('e2');                    if (my !== runId || !auto.isConnected) return;
+      show('im');                              if (!(await alive(420))) return;
+      drawWire('e6'); drawWire('e7');
+      if (!(await alive(220))) return;
+      show('ac');   if (!(await alive(150))) return;
+      show('up');
+      if (!(await alive(4600))) return;
+      run();                                                      // loop
+    }
+    auto.querySelector('.au-replay').addEventListener('click', run);
+    run();                                                        // kick off on open (no scroll trigger on the brain)
+  }
+
+  // fast typewriter: type a note → hold → reverse-erase → next → loop. Stops once el is removed.
+  function typewriter(el, notes, { type = 30, erase = 14, hold = 5000, gap = 550 } = {}) {
+    const text = document.createTextNode(''), caret = document.createElement('span');
+    caret.className = 'caret'; el.append(text, caret);
+    let n = 0; const jitter = () => type * (0.5 + Math.random());
+    (function typeNote() {
+      const s = notes[n]; let i = 0;
+      (function step() {
+        if (!el.isConnected) return;
+        text.nodeValue = s.slice(0, i);
+        if (i++ <= s.length) setTimeout(step, jitter());
+        else setTimeout(eraseNote, hold);
+      })();
+    })();
+    function eraseNote() {
+      if (!el.isConnected) return;
+      const s = text.nodeValue; let i = s.length;
+      (function step() {
+        if (!el.isConnected) return;
+        text.nodeValue = s.slice(0, i);
+        if (i-- > 0) setTimeout(step, erase);
+        else { n = (n + 1) % notes.length; setTimeout(restart, gap); }
+      })();
+    }
+    function restart() {
+      const s = notes[n]; let i = 0;
+      (function step() {
+        if (!el.isConnected) return;
+        text.nodeValue = s.slice(0, i);
+        if (i++ <= s.length) setTimeout(step, jitter());
+        else setTimeout(eraseNote, hold);
+      })();
+    }
+  }
+
+  // reCAPTCHA: click box → spinner → green tick (click again resets).
+  function initCaptcha(rc) {
+    if (!rc) return;
+    const box = rc.querySelector('.checkbox'); let state = 'idle';
+    box.addEventListener('click', () => {
+      if (state === 'checking') return;
+      if (state === 'done') { rc.classList.remove('done'); rc.setAttribute('aria-checked','false'); state = 'idle'; return; }
+      state = 'checking'; rc.classList.add('checking');
+      setTimeout(() => { rc.classList.remove('checking'); rc.classList.add('done'); rc.setAttribute('aria-checked','true'); state = 'done'; }, 750);
+    });
   }
 
   /* ── build the kept manifestations ──
@@ -772,6 +1486,7 @@
     place(buildAutomations(),    225, DN, FOLDER);   // LEFT — folder (lower)
     place(buildIdeas2am(),       270, UP, FOLDER);   // LEFT — folder (upper)
     place(buildModel(),          315, DN);           // LEFT — leaderboard (lower)
+    place(buildTokens(),         315, 0.80, 1.05);    // UPPER-LEFT — elevated above the leaderboard, balancing the right cluster
   }
 
   function mk(cls, html){ const d=document.createElement('div'); d.className='panel '+cls; d.innerHTML=html; panelsLayer.appendChild(d); return d; }
@@ -782,10 +1497,45 @@
     makeFan(d, files, isPage);
     return d;
   }
-  const buildThingsAi      = () => folder('thingsThatCouldBeAiFolder.png', 'Things That Could Be AI', ['my morning coffee', 'reply-all emails', 'standup updates', 'expense reports'], false);
-  const buildProductsBuild = () => folder('productsToBuildFolder.png',     'Products to Build',       ['AI résumé tailor', 'meeting summarizer', 'inbox-zero bot', 'prompt linter'], false);
-  const buildAutomations   = () => folder('automationsFolder.png',         'Automations',             ['inbox → Notion', 'PR → Slack ping', 'receipts → sheet', 'standup auto-post'], false);
-  const buildIdeas2am      = () => folder('ideasAt2amFolder.png',          'Ideas at 2 AM',           ['app that naps for you', 'AI that says no', 'startup: touch grass', 'what if RAM dreams?'], true);
+  const buildThingsAi      = () => {                              // opens Football Tracker + AI Kitchen Co-Pilot + Notes Editor 3
+    const d = mk('folder', `<img src="assets/thingsThatCouldBeAiFolder.png" alt="Things That Could Be AI" draggable="false"/>`);
+    makeThingsAiPanels(d);
+    return d;
+  };
+  const buildProductsBuild = () => {                              // opens To-do List + Notes Editor 2 (see makeProductsBuildPanels)
+    const d = mk('folder', `<img src="assets/productsToBuildFolder.png" alt="Products to Build" draggable="false"/>`);
+    makeProductsBuildPanels(d);
+    return d;
+  };
+  const buildAutomations   = () => {                              // opens Automation Flow + Notes Editor 4 (see makeAutomationsPanels)
+    const d = mk('folder', `<img src="assets/automationsFolder.png" alt="Automations" draggable="false"/>`);
+    makeAutomationsPanels(d);
+    return d;
+  };
+  const buildIdeas2am      = () => {                              // opens the 3 real panels (see makeIdeas2amPanels)
+    const d = mk('folder', `<img src="assets/ideasAt2amFolder.png" alt="Ideas at 2 AM" draggable="false"/>`);
+    makeIdeas2amPanels(d);
+    return d;
+  };
+
+  /* ── TOKENS (Figma) — black usage-meter card: dot-matrix title + dotted spend bar + DETAILS pill ── */
+  function buildTokens() {
+    const COLS = 44, FILLED = 30;                 // 30 white (used) + 14 grey (headroom) — matches the design
+    let bar = '';
+    for (let i = 0; i < COLS; i++) {
+      const off  = i >= FILLED ? ' off'  : '';
+      const lead = i === FILLED - 1 ? ' lead' : '';   // last lit column pulses like a live cursor
+      bar += `<div class="tcol${lead}"><div class="tdot${off}"></div><div class="tdot${off}"></div><div class="tdot${off}"></div></div>`;
+    }
+    return mk('tokens', `<div class="tcard">
+      <div class="ttitle">TOKENS</div>
+      <div class="trow"><span>SPENT : $1400</span><span>LIMIT : $500.00</span></div>
+      <div class="tbar">${bar}</div>
+      <div class="tfoot">
+        <div class="twarn">You’re getting close to your limit consider slowing down spending</div>
+        <div class="tbtn">DETAILS</div>
+      </div></div>`);
+  }
 
   /* ── TERMINAL — real streaming logs, chaotic on hover ── */
   function buildTerminal() {

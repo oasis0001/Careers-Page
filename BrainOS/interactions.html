@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>BrainOS — Interaction Windows (workbench)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
 <!--
   ════════════════════════════════════════════════════════════════════════
   BRAINOS · INTERACTION WINDOWS — WORKBENCH
@@ -18,7 +21,7 @@
     1 · Ideas at 2 AM        → Notes Editor 1 (typewriter) · Captcha · Doc File
     2 · Products to Build     → To-do List · Notes Editor 2 (typewriter)
     3 · Things That Could Be AI → Football Tracker (drag) · AI Kitchen Co-Pilot · Notes Editor 3
-    4 · Automations           → Automation Flow (auto-connect) · Notes Editor 4
+    4 · Automations           → Automation Flow (auto-connect) · Notes Editor 4 (drag work → trash)
 
   Assets
     folder icons + kitchen pixel art → ./assets/
@@ -109,6 +112,58 @@
   @keyframes blink{50%{opacity:0;}}
 
   /* ════════════════════════════════════════════════════════════════
+     NOTES EDITOR 4 — "What all can be automated?" (Figma node 2022:911)
+     iOS Notes chrome + a drag-the-drudgery game: grab a task capsule and
+     drop it on the trash → it's tossed in, the "automated" badge ticks up,
+     the bin gulps, and a fresh task slides in. There's always more to automate.
+     ════════════════════════════════════════════════════════════════ */
+  .note.a4note{ --w:340px; }
+  .a4{ position:absolute; left:6%; right:5.5%; top:16%; bottom:5.5%;
+       display:flex; flex-direction:column; font-family:var(--sans); }
+  .a4-title{ font-size:20px; font-weight:600; letter-spacing:-.5px; color:#111;
+       line-height:1.04; margin:0 0 13px; }
+  .a4-body{ flex:1; display:flex; gap:12px; align-items:flex-start; min-height:0; }
+
+  /* the trash — drop target */
+  .a4-bin{ position:relative; width:84px; flex:none; align-self:flex-start; margin-top:2px;
+       transition:transform .28s var(--spring), filter .28s; }
+  .a4-bin img{ width:84px; height:auto; display:block; pointer-events:none;
+       user-select:none; -webkit-user-drag:none; }
+  .a4-bin .lbl{ position:absolute; top:56%; left:50%; transform:translate(-50%,-50%);
+       width:46px; text-align:center; font-size:10px; line-height:1.0; font-weight:600;
+       color:#161616; letter-spacing:-.2px; pointer-events:none; }
+  .a4-bin .badge{ position:absolute; right:5px; bottom:13px; min-width:19px; height:19px;
+       padding:0 4px; border-radius:999px; background:#ff3b30; color:#fff;
+       font-size:11px; font-weight:700; line-height:19px; text-align:center;
+       box-shadow:0 2px 6px rgba(0,0,0,.3); pointer-events:none; font-variant-numeric:tabular-nums; }
+  .a4-bin.over{ transform:scale(1.07); filter:drop-shadow(0 8px 16px rgba(58,91,255,.5)); }
+  .a4-bin.gulp{ animation:binGulp .42s var(--spring); }
+  @keyframes binGulp{ 0%{transform:scale(1);} 28%{transform:scale(.9,1.09);}
+       58%{transform:scale(1.07,.95);} 100%{transform:scale(1);} }
+  .a4-bin .badge.pop{ animation:badgePop .42s var(--spring); }
+  @keyframes badgePop{ 0%{transform:scale(1);} 42%{transform:scale(1.4);} 100%{transform:scale(1);} }
+
+  /* the capsule list (bottom edge fades, hinting at more — matches the artboard) */
+  .a4-list{ flex:1; min-width:0; display:flex; flex-direction:column; align-self:stretch;
+       -webkit-mask-image:linear-gradient(#000 88%, rgba(0,0,0,.35));
+               mask-image:linear-gradient(#000 88%, rgba(0,0,0,.35)); }
+  .a4-cap{ background:#dcdcdc; color:#1c1c1c; font-size:11px; letter-spacing:-.2px;
+       padding:6.5px 12px; margin-bottom:5px; border-radius:999px; max-height:40px;
+       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+       cursor:grab; user-select:none; touch-action:none; will-change:transform;
+       transition:transform .32s var(--spring), background .2s, box-shadow .2s,
+                  max-height .36s var(--soft), opacity .3s, margin .36s var(--soft), padding .3s; }
+  .a4-cap:last-child{ margin-bottom:0; }
+  .a4-cap:hover{ background:#d0d0d0; }
+  /* lifted out of the panel to <body> so it floats above everything, never clipped */
+  .a4-cap.dragging{ z-index:9999; transition:none; cursor:grabbing;
+       background:#d6e3ff; box-shadow:0 14px 30px rgba(20,30,70,.3); }
+  .a4-cap.leaving{ pointer-events:none; z-index:9999; }
+  .a4-ph{ pointer-events:none; }                  /* invisible slot-holder while dragging */
+  .a4-cap.spawn{ animation:capIn .42s var(--spring) both; }
+  @keyframes capIn{ from{opacity:0; transform:translateX(16px) scale(.95);} }
+
+  /* ════════════════════════════════════════════════════════════════
      CAPTCHA — Apple-Notes "Draft" window + interactive reCAPTCHA
      ════════════════════════════════════════════════════════════════ */
   .cap-win{ width:300px; }
@@ -175,7 +230,7 @@
     transition:max-height .4s var(--soft), opacity .32s ease, padding .4s var(--soft),
                margin .4s var(--soft), transform .4s var(--soft), border-color .3s; }
   @keyframes itemIn{from{opacity:0; transform:translateY(-8px) scale(.97);}}
-  /* clicked → "cut" (done), then collapses out of the list after 2s */
+  /* clicked → "cut" (done), then collapses out of the list after STAY_MS (see todoInit) */
   .todo .item.removing{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; margin-top:-10px;
     transform:scale(.96); border-color:transparent; }
   .todo .top .add.full{ animation:shake .34s; }
@@ -210,7 +265,7 @@
   .ft-field .rec{ position:absolute; top:9px; right:11px; font-family:var(--mono); font-size:9.5px;
     letter-spacing:1px; color:#d23b3b; display:flex; align-items:center; gap:5px; }
   .ft-field .rec .dot{ width:7px;height:7px;border-radius:50%; background:#e23b3b; animation:pulse 1.2s infinite; }
-  .ft-field .hint{ position:absolute; bottom:9px; left:11px; font-family:var(--mono); font-size:9.5px;
+  .ft-field .hint{ position:absolute; bottom:9px; right:11px; font-family:var(--mono); font-size:9.5px;
     letter-spacing:.6px; color:#9aa0b4; }
   .ft-trail{ position:absolute; inset:0; pointer-events:none; }
   .ft-trail polyline{ fill:none; stroke:#1b4dff; stroke-width:1.6; stroke-linecap:round;
@@ -224,9 +279,20 @@
   .ft-box i.tr{ right:-1px; top:-1px; border-left:none; border-bottom:none; }
   .ft-box i.bl{ left:-1px; bottom:-1px; border-right:none; border-top:none; }
   .ft-box i.br{ right:-1px; bottom:-1px; border-left:none; border-top:none; }
-  .ft-box .lab{ position:absolute; left:-1px; top:-17px; background:#1b4dff; color:#fff;
-    font-family:var(--mono); font-size:9px; letter-spacing:.4px; padding:1px 5px; white-space:nowrap;
-    font-variant-numeric:tabular-nums; }
+  .ft-field .ft-vel{ position:absolute; bottom:10px; left:11px; z-index:2;
+    font-family:var(--mono); letter-spacing:.6px; color:#1b4dff;
+    display:flex; align-items:baseline; gap:7px;
+    padding:6px 12px; border-radius:10px;
+    background:rgba(27,77,255,.09); border:1px solid rgba(27,77,255,.28);
+    box-shadow:0 2px 12px rgba(27,77,255,.18);
+    transition:background .15s, border-color .15s, box-shadow .15s; }
+  .ft-field .ft-vel .k{ font-size:9px; letter-spacing:1px; color:#7b86b8; align-self:center; }
+  .ft-field .ft-vel .v{ font-size:22px; font-weight:700; line-height:1; min-width:48px;
+    text-align:right; font-variant-numeric:tabular-nums; color:#1b4dff; }
+  .ft-field .ft-vel .u{ font-size:10px; color:#7b86b8; }
+  /* kick → the readout flares so the speed spike is obvious */
+  .ft-field.kick .ft-vel{ background:rgba(27,77,255,.17); border-color:rgba(27,77,255,.55);
+    box-shadow:0 0 0 2px rgba(27,77,255,.18), 0 4px 18px rgba(27,77,255,.4); }
 
   /* ════════════════════════════════════════════════════════════════
      AI KITCHEN CO-PILOT — Preview window, pixel kitchen, chat + chips
@@ -253,19 +319,21 @@
      AUTOMATION FLOW — white canvas; nodes reveal & connect left→right,
      packets stream along the wired edges. Loops.
      ════════════════════════════════════════════════════════════════ */
-  /* matches Figma node 1962:115 "Approval Automation Flow" (1015×516 design space) */
-  .auto{ width:100%; max-width:1015px; aspect-ratio:1015/516; position:relative;
-    background:#fff; border-radius:22px; border:1px solid #e4e4e8; overflow:hidden; }
-  .auto .au-title{ position:absolute; left:6.3%; top:9.9%; transform:translateY(-50%);
-    font-size:clamp(18px,2.7vw,28px); font-weight:600; letter-spacing:-.6px; color:#1c1e26; z-index:4; }
+  /* matches Figma node 2011:197 "Approval Automation Flow" (436.6×270.5 design space, dotted bg) */
+  .auto{ width:650px; max-width:100%; aspect-ratio:436.6/270.5; position:relative;
+    background:#fff; border-radius:26px; border:1px solid #e4e4e8; overflow:hidden; }
+  .auto .au-title{ position:absolute; left:3.8%; top:12.2%; transform:translateY(-50%);
+    font-family:'Inter Tight',var(--sans); font-size:35px; font-weight:400; letter-spacing:-.7px;
+    line-height:.88; color:#111; z-index:4; }
   .auto .au-replay{ position:absolute; right:14px; top:14px; z-index:5; cursor:pointer; font-size:13px;
     color:#3a5bff; border:1px solid #dbe2fb; border-radius:8px; padding:5px 9px; background:#f6f8ff;
     line-height:1; transition:background .2s; }
   .auto .au-replay:hover{ background:#e9f0ff; }
   .auto .canvas{ position:absolute; inset:0; }
   .auto svg.edges{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
-  .auto svg.edges path.wire{ fill:none; stroke:#d2d6e2; stroke-width:1.8; stroke-linecap:round; }
-  .auto svg.edges path.flow{ fill:none; stroke:#3a5bff; stroke-width:1.8; stroke-linecap:round;
+  .auto svg.edges rect.dots{ pointer-events:none; opacity:.5; }
+  .auto svg.edges path.wire{ fill:none; stroke:#cfd3e0; stroke-width:1; stroke-linecap:round; }
+  .auto svg.edges path.flow{ fill:none; stroke:#3a5bff; stroke-width:1; stroke-linecap:round;
     filter:drop-shadow(0 0 3px rgba(58,91,255,.5)); }
   .auto svg.edges circle.packet{ fill:#3a5bff; filter:drop-shadow(0 0 5px rgba(58,91,255,.9)); opacity:0; }
   .auto .node{ position:absolute; display:flex; align-items:center; gap:11px;
@@ -277,7 +345,8 @@
   .auto .node .ico{ width:41px; height:41px; flex:none; border-radius:11px; background:var(--tint,#eef2ff);
     display:flex; align-items:center; justify-content:center; }
   .auto .node .ico svg{ width:25px; height:25px; display:block; }
-  .auto .node .lbl{ font-size:14px; font-weight:450; color:#1c1e26; letter-spacing:-.2px; white-space:nowrap; }
+  .auto .node .lbl{ font-family:'Inter Tight',var(--sans); font-size:16px; font-weight:400;
+    color:#111; letter-spacing:-.33px; line-height:.88; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -438,8 +507,9 @@
               <div class="grid"></div>
               <div class="rec mono"><span class="dot"></span>REC · TRACKING</div>
               <svg class="ft-trail"><polyline points=""/></svg>
-              <div class="ft-box"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i><span class="lab">⚽ BALL 0.98</span></div>
+              <div class="ft-box"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
               <div class="ft-ball">⚽️</div>
+              <div class="ft-vel mono"><span class="k">VELOCITY</span><b class="v">0.0</b><span class="u">m/s</span></div>
               <div class="hint mono">press anywhere to kick →</div>
             </div>
           </div>
@@ -453,7 +523,7 @@
           <div class="mac kit">
             <div class="bar">
               <span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span>
-              <span class="title">untitled.jpg<span class="chev">⌄</span></span>
+              <span class="title">untitled.html<span class="chev">⌄</span></span>
             </div>
             <div class="body">
               <div class="h">AI Kitchen Co-Pilot</div>
@@ -472,7 +542,7 @@
       <div class="stage">
         <div class="platform">
           <!-- Notes Editor 3 — iOS Notes -->
-          <div class="note" data-note="3" style="--w:300px; --t:30%; --l:5.5%; --r:5%; --fs:17px; --lh:1.32; --col:#363636;">
+          <div class="note" data-note="3" style="--w:300px; --t:24%; --l:5.5%; --r:5%; --fs:17px; --lh:1.32; --col:#363636;">
             <img class="chrome" src="../panels/notesEditor3.webp" alt="Notes editor">
             <div class="type" style="font-family:var(--sans);"></div>
           </div>
@@ -496,14 +566,21 @@
     <div class="stages">
 
       <div class="stage full">
-        <div class="platform" style="width:100%; max-width:1015px;">
-          <!-- Automation Flow — "Approval Automation Flow" (Figma node 1962:115) -->
+        <div class="platform" style="width:650px; max-width:100%;">
+          <!-- Automation Flow — "Approval Automation Flow" (Figma node 2011:197) -->
           <div class="auto">
             <div class="au-title">Approval Automation Flow</div>
             <button class="au-replay" title="replay">↺</button>
             <div class="canvas">
-              <svg class="edges" viewBox="0 0 1015 516" preserveAspectRatio="none"></svg>
-              <!-- nodes injected by JS -->
+              <svg class="edges" viewBox="0 0 436.6 270.5" preserveAspectRatio="none">
+                <defs>
+                  <pattern id="auto-dots" width="14" height="12" patternUnits="userSpaceOnUse">
+                    <circle cx="1" cy="1" r="0.9" fill="#d6d7dc"/>
+                  </pattern>
+                </defs>
+                <rect class="dots" x="0" y="0" width="436.6" height="270.5" fill="url(#auto-dots)"/>
+                <!-- wires injected by JS -->
+              </svg>
             </div>
           </div>
         </div>
@@ -512,13 +589,23 @@
 
       <div class="stage">
         <div class="platform">
-          <!-- Notes Editor 4 — iOS Notes -->
-          <div class="note" data-note="4" style="--w:340px; --t:17%; --l:7%; --r:7%; --fs:15px; --lh:1.5; --col:#111;">
+          <!-- Notes Editor 4 — "What all can be automated?" · drag boring work into the trash -->
+          <div class="note a4note">
             <img class="chrome" src="../panels/notesEditor4.webp" alt="Notes editor">
-            <div class="type" style="font-family:var(--sans);"></div>
+            <div class="a4">
+              <div class="a4-title">What all can be automated?</div>
+              <div class="a4-body">
+                <div class="a4-bin" aria-label="Boring Manual Work — trash">
+                  <img src="assets/automationTrash.png" alt="">
+                  <span class="lbl">Boring Manual Work</span>
+                  <span class="badge">12</span>
+                </div>
+                <div class="a4-list"><!-- task capsules injected by JS --></div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="cap"><div class="nm">Notes Editor 4</div><div class="tag">typewriter · auto</div></div>
+        <div class="cap"><div class="nm">Notes Editor 4</div><div class="tag">interactive · drag work to trash</div></div>
       </div>
 
     </div>
@@ -528,10 +615,11 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════════════════
-   1 · TYPEWRITER  (Notes Editors 1–4)
+   1 · TYPEWRITER  (Notes Editors 1–3)
    type a note fast → hold 5s → reverse-type it away → next note → loop
+   (Notes Editor 4 is interactive — see section 7 — so it's not listed here)
    ════════════════════════════════════════════════════════════════════════ */
-// Content taken verbatim from the Figma artboards (1940:333 / 1940:359 / 1962:109 / 1962:114)
+// Content taken verbatim from the Figma artboards (1940:333 / 1940:359 / 1962:109)
 // so each editor types out exactly what the design shows, holds, erases, repeats.
 const NOTES = {
   1: [ // Ideas at 2 AM — Apple Notes "Ideas" (node 1940:333)
@@ -542,9 +630,6 @@ const NOTES = {
   ],
   3: [ // Things That Could Be AI — iOS Notes (node 1962:109)
     "•  Recycle Bin App\n•  The Financial Chaperone\n•  Sleep-Deprivation Engine\n•  Email Spam Filter\n•  Mind-Reader"
-  ],
-  4: [ // Automations — iOS Notes (node 1962:114)
-    "What all can be automated?\n\n•  Email reply drafts\n•  Database Migration Reviews\n•  Calendar management\n•  File renaming and organisation\n•  Raising support tickets\n•  Analysing logs"
   ]
 };
 function typewriter(el, notes, {type=30, erase=14, hold=5000, gap=550}={}){
@@ -578,7 +663,7 @@ function typewriter(el, notes, {type=30, erase=14, hold=5000, gap=550}={}){
     })();
   }
 }
-document.querySelectorAll('.note').forEach(note => {
+document.querySelectorAll('.note[data-note]').forEach(note => {
   const which = note.dataset.note;
   typewriter(note.querySelector('.type'), NOTES[which]);
 });
@@ -616,6 +701,8 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
     ['🎛️','model_ab_test_harness'], ['🗂️','rag_that_actually_works'], ['🔁','self_healing_pipelines']
   ];
   const MAX = 5;                         // never hold more than 5 todos
+  const STAY_MS = 800;                   // ◀ how long a completed (struck-through) task lingers before it collapses out
+  const COLLAPSE_MS = 420;               // fade/collapse animation length — keep ≥ CSS .item max-height transition (.4s)
   let p = 0;
   const addBtn = todo.querySelector('.add');
   function count(){ return rows.querySelectorAll('.item:not(.removing)').length; }
@@ -624,10 +711,10 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
     ck.addEventListener('click', () => {
       if (item.classList.contains('done')) return;   // already cut → ignore
       item.classList.add('done');                     // tick + strike-through ("cut")
-      setTimeout(() => {                              // …then delete after 2s
+      setTimeout(() => {                              // …then delete after STAY_MS
         item.classList.add('removing');
-        setTimeout(() => item.remove(), 420);
-      }, 2000);
+        setTimeout(() => item.remove(), COLLAPSE_MS);
+      }, STAY_MS);
     });
   }
   rows.querySelectorAll('.item').forEach(bind);
@@ -653,10 +740,11 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
   if (!field) return;
   const ball = field.querySelector('.ft-ball');
   const box  = field.querySelector('.ft-box');
-  const lab  = field.querySelector('.ft-box .lab');
+  const vel  = field.querySelector('.ft-vel .v');
   const poly = field.querySelector('.ft-trail polyline');
-  const R = 23, PAD = 14;                          // ball radius, detection-box padding
-  const BASE = 2.7, BOOST = 18, DECAY = 0.975;     // cruise speed · press kick · per-frame boost decay
+  const R = 23, VRX = 20, VRY = 23, PAD = 14;      // element half-size (centering) · visible-glyph radii x/y (collision — the ⚽ glyph is ~40w×47t, not square) · detection-box padding
+  const BASE = 2.7, BOOST = 18, DECAY = 0.99;      // cruise speed · press kick · per-frame boost decay (→1 = speed lingers longer after a kick)
+  const VSCALE = 3.6;                              // px/frame → displayed m/s (telemetry feel)
   let W = 0, H = 0;
   function measure(){ const r = field.getBoundingClientRect(); W = r.width; H = r.height; }
   measure(); window.addEventListener('resize', measure);
@@ -665,11 +753,11 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
   let x = 120, y = 130, vx = BASE * 0.9, vy = -BASE * 0.6;
   const trail = [];
 
-  function bounce(){
-    if (x < R){ x = R; vx = Math.abs(vx); }
-    if (x > W - R){ x = W - R; vx = -Math.abs(vx); }
-    if (y < R){ y = R; vy = Math.abs(vy); }
-    if (y > H - R){ y = H - R; vy = -Math.abs(vy); }
+  function bounce(){                               // clamp to the visible glyph (VRX/VRY), not the padded element box — so it kisses the wall
+    if (x < VRX){ x = VRX; vx = Math.abs(vx); }
+    if (x > W - VRX){ x = W - VRX; vx = -Math.abs(vx); }
+    if (y < VRY){ y = VRY; vy = Math.abs(vy); }
+    if (y > H - VRY){ y = H - VRY; vy = -Math.abs(vy); }
   }
   // press ANYWHERE on the field → big kick (accelerate a lot); it then decays back to cruise
   field.addEventListener('pointerdown', () => {
@@ -693,9 +781,8 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
     const bs = R + PAD;
     box.style.left = (x - bs) + 'px'; box.style.top = (y - bs) + 'px';
     box.style.width = box.style.height = (bs * 2) + 'px';
-    // label: "confidence" climbs with speed (so a kick visibly spikes it)
-    const conf = 0.93 + Math.min(0.06, (s - BASE) * 0.006) + Math.random() * 0.005;
-    lab.textContent = `⚽ BALL ${conf.toFixed(2)}`;
+    // velocity HUD (bottom-left): stylized m/s magnitude — spikes on a kick, settles back to cruise
+    vel.textContent = (s * VSCALE).toFixed(1);
     // dashed tracking trail
     trail.push(x.toFixed(0) + ',' + y.toFixed(0));
     if (trail.length > 18) trail.shift();
@@ -751,18 +838,18 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
 })();
 
 /* ════════════════════════════════════════════════════════════════════════
-   6 · AUTOMATION FLOW — "Approval Automation Flow" (Figma node 1962:115).
-   Form Submission → AI Agent (+ Chat Model / Chat Memory / Entra D tools)
-   → Is Manager? → Add to channel / Update Profile. Nodes reveal & wires draw
-   left→right; packets then stream along the connected edges. Loops.
-   Coordinate space = the design's 1015×516 (the edges-svg viewBox).
+   6 · AUTOMATION FLOW — "Approval Automation Flow" (Figma node 2011:197).
+   Form Submission → AI Agent (+ Chat Model / Entra D tools) → Is Manager?
+   → Add to channel / Update Profile. Nodes reveal & wires draw left→right;
+   packets then stream along the connected edges. Loops.
+   Coordinate space = the design's 436.6×270.5 (the edges-svg viewBox).
    ════════════════════════════════════════════════════════════════════════ */
 (function automationInit(){
   const auto = document.querySelector('.auto');
   if (!auto) return;
   const canvas = auto.querySelector('.canvas');
   const svg = auto.querySelector('svg.edges');
-  const VW = 1015, VH = 516, NH = 56.8;   // design space; nodes share it so ports meet wires
+  const VW = 436.6, VH = 270.5, NH = 36.83;   // design space; nodes share it so ports meet wires
 
   // Phosphor-style line icons, tinted to each node's accent (Slack stays multi-colour)
   function icon(key, c){
@@ -775,21 +862,20 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
       case 'db':    return `<svg viewBox="0 0 24 24" ${A}><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.6 3.1 3 7 3s7-1.4 7-3V6"/><path d="M5 12c0 1.6 3.1 3 7 3s7-1.4 7-3"/></svg>`;
       case 'win':   return `<svg viewBox="0 0 24 24" fill="${c}"><rect x="3.5" y="3.5" width="7.4" height="7.4" rx="1.2"/><rect x="13.1" y="3.5" width="7.4" height="7.4" rx="1.2"/><rect x="3.5" y="13.1" width="7.4" height="7.4" rx="1.2"/><rect x="13.1" y="13.1" width="7.4" height="7.4" rx="1.2"/></svg>`;
       case 'users': return `<svg viewBox="0 0 24 24" ${A}><circle cx="8" cy="8" r="3.2"/><path d="M2.8 19c0-3 2.3-5.2 5.2-5.2S13.2 16 13.2 19"/><path d="M15.5 9h5.5M15.5 13h5.5M15.5 17h5.5"/></svg>`;
-      case 'slack': return `<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round"><line x1="9" y1="4.5" x2="9" y2="19.5" stroke="#36C5F0"/><line x1="15" y1="4.5" x2="15" y2="19.5" stroke="#2EB67D"/><line x1="4.5" y1="9" x2="19.5" y2="9" stroke="#ECB22E"/><line x1="4.5" y1="15" x2="19.5" y2="15" stroke="#E01E5A"/></svg>`;
+      case 'slack': return `<svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.6" stroke-linecap="round"><line x1="9.6" y1="3.6" x2="9.6" y2="11"/><line x1="14.4" y1="13" x2="14.4" y2="20.4"/><line x1="3.6" y1="14.4" x2="11" y2="14.4"/><line x1="13" y1="9.6" x2="20.4" y2="9.6"/></svg>`;
     }
     return '';
   }
 
   // nodes: x,y,w in design units (1015×516). tint = icon-square bg, color = icon stroke.
   const N = {
-    fs:   { x:64,  y:223, w:200.6, label:'Form Submission', tint:'#e8f8ef', color:'#2bbd6b', icon:'file'  },
-    ai:   { x:339, y:223, w:139.6, label:'AI Agent',        tint:'#efedfe', color:'#7b6ef6', icon:'code'  },
-    im:   { x:554, y:223, w:168.6, label:'Is Manager ?',    tint:'#e8f8ef', color:'#2bbd6b', icon:'check' },
-    cm:   { x:141, y:356, w:161.6, label:'Chat Model',      tint:'#eaf1fe', color:'#4b8cf5', icon:'tree'  },
-    cmem: { x:321, y:356, w:176.6, label:'Chat Memory',     tint:'#eaf1fe', color:'#4b8cf5', icon:'db'    },
-    ed:   { x:512, y:356, w:131.6, label:'Entra D',         tint:'#eaf1fe', color:'#4b8cf5', icon:'win'   },
-    ac:   { x:787, y:163, w:185.6, label:'Add to channel',  tint:'#fff3e0', color:'#e8a33d', icon:'slack' },
-    up:   { x:787, y:289, w:178.6, label:'Update Profile',  tint:'#fff3e0', color:'#e8a33d', icon:'users' }
+    fs: { x:16.9,   y:66.74,  w:129.67, label:'Form Submission', tint:'#e8f8ef', color:'#2bbd6b', icon:'file'  },
+    ai: { x:64.72,  y:136.28, w:90.67,  label:'AI Agent',        tint:'#efedfe', color:'#7b6ef6', icon:'code'  },
+    im: { x:173.52, y:136.32, w:109.67, label:'Is Manager ?',    tint:'#e8f8ef', color:'#2bbd6b', icon:'check' },
+    cm: { x:16.72,  y:208.26, w:104.67, label:'Chat Model',      tint:'#eaf1fe', color:'#4b8cf5', icon:'tree'  },
+    ed: { x:139.02, y:208.26, w:85.67,  label:'Entra D',         tint:'#eaf1fe', color:'#4b8cf5', icon:'win'   },
+    ac: { x:293.51, y:99.49,  w:120.67, label:'Add to channel',  tint:'#fff3e0', color:'#e8a33d', icon:'slack' },
+    up: { x:293.51, y:180.42, w:116.67, label:'Update Profile',  tint:'#fff3e0', color:'#e8a33d', icon:'users' }
   };
   Object.entries(N).forEach(([id, n]) => {
     const el = document.createElement('div');
@@ -805,13 +891,12 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
 
   // edges: exact paths from the design (curved branches, straight trunk)
   const EDGES = [
-    { id:'e1', to:'ai',   d:'M 264.6 251.4 L 339 251.4' },                                  // FS → AI
-    { id:'e3', to:'cm',   d:'M 408.8 279.8 C 408.8 322 221.8 314 221.8 356' },               // AI → Chat Model
-    { id:'e4', to:'cmem', d:'M 408.8 279.8 L 409.3 356' },                                   // AI → Chat Memory
-    { id:'e5', to:'ed',   d:'M 408.8 279.8 C 408.8 322 577.8 314 577.8 356' },               // AI → Entra D
-    { id:'e2', to:'im',   d:'M 478.6 251.4 L 554 251.4' },                                   // AI → Is Manager?
-    { id:'e6', to:'ac',   d:'M 722.6 251.4 C 758 251.4 758 191.4 787 191.4' },               // IM → Add to channel
-    { id:'e7', to:'up',   d:'M 722.6 251.4 C 758 251.4 758 317.4 787 317.4' }                // IM → Update Profile
+    { id:'e1', to:'ai', d:'M 52 103.57 C 52 140 54 154.7 64.72 154.7' },             // Form Submission → AI Agent
+    { id:'e2', to:'im', d:'M 155.39 154.7 L 173.52 154.7' },                          // AI Agent → Is Manager?
+    { id:'e3', to:'cm', d:'M 110.06 173.11 C 110.06 196 69.06 188 69.06 208.26' },    // AI Agent → Chat Model
+    { id:'e4', to:'ed', d:'M 110.06 173.11 C 110.06 196 181.85 188 181.85 208.26' },  // AI Agent → Entra D
+    { id:'e5', to:'ac', d:'M 283.19 154.74 C 288 154.74 288 117.91 293.51 117.91' },  // Is Manager? → Add to channel
+    { id:'e6', to:'up', d:'M 283.19 154.74 C 288 154.74 288 198.83 293.51 198.83' }   // Is Manager? → Update Profile
   ];
   const wire = {};
   EDGES.forEach(e => {
@@ -820,7 +905,7 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
     const f = document.createElementNS(svg.namespaceURI, 'path');
     f.setAttribute('class', 'flow'); f.setAttribute('d', e.d);
     const p = document.createElementNS(svg.namespaceURI, 'circle');
-    p.setAttribute('class', 'packet'); p.setAttribute('r', '3.8');
+    p.setAttribute('class', 'packet'); p.setAttribute('r', '2');
     svg.append(w, f, p);
     const len = f.getTotalLength();
     f.style.strokeDasharray = w.style.strokeDasharray = len;
@@ -867,14 +952,13 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
     show('fs');                              if (!(await alive(380))) return;
     await drawWire('e1');                    if (my !== runId) return;   // → AI Agent
     show('ai');                              if (!(await alive(420))) return;
-    drawWire('e3'); drawWire('e4'); drawWire('e5');                      // AI's tools fan out
+    drawWire('e3'); drawWire('e4');                                      // AI's tools fan out
     if (!(await alive(220))) return;
-    show('cm');  if (!(await alive(140))) return;
-    show('cmem');if (!(await alive(140))) return;
+    show('cm');  if (!(await alive(150))) return;
     show('ed');  if (!(await alive(360))) return;
     await drawWire('e2');                    if (my !== runId) return;   // → Is Manager?
     show('im');                              if (!(await alive(420))) return;
-    drawWire('e6'); drawWire('e7');                                      // branch to outputs
+    drawWire('e5'); drawWire('e6');                                      // branch to outputs
     if (!(await alive(220))) return;
     show('ac');  if (!(await alive(150))) return;
     show('up');
@@ -888,6 +972,149 @@ document.querySelectorAll('.recaptcha').forEach(rc => {
     ents.forEach(e => { if (e.isIntersecting){ run(); obs.disconnect(); } });
   }, { threshold: 0.3 });
   io.observe(auto);
+})();
+
+/* ════════════════════════════════════════════════════════════════════════
+   7 · NOTES EDITOR 4 — "What all can be automated?" (Figma node 2022:911)
+   Drag a boring-task capsule onto the trash → it flies in, its slot
+   collapses, the bin gulps, the "automated" badge ticks up, and a fresh
+   task slides in from the pool. There's always more manual work to automate.
+   Pointer-driven so it works with both mouse and touch.
+   ════════════════════════════════════════════════════════════════════════ */
+(function automationNoteInit(){
+  const root = document.querySelector('.a4note');
+  if (!root) return;
+  const bin   = root.querySelector('.a4-bin');
+  const badge = bin.querySelector('.badge');
+  const list  = root.querySelector('.a4-list');
+
+  // the six tasks on the artboard, then an endless supply of more drudgery
+  const SEED = [
+    'Email reply drafts', 'Database Migration Reviews', 'Calendar management',
+    'File renaming and organisation', 'Raising support tickets', 'Analysing logs'
+  ];
+  const POOL = [
+    'Standup status updates', 'Expense report filing', 'Meeting note summaries',
+    'Invoice reconciliation', 'Sorting the inbox', 'Scheduling interviews',
+    'Weekly metrics reports', 'Following up on emails', 'Formatting documents',
+    'Tagging support tickets', 'Backing up old files', 'Updating the changelog',
+    'Renaming screenshots', 'Data entry from PDFs', 'Chasing approvals'
+  ];
+  const MAX = 6;
+  let pi = 0, automated = parseInt(badge.textContent, 10) || 0;
+
+  function makeCapsule(text, spawn){
+    const c = document.createElement('div');
+    c.className = 'a4-cap' + (spawn ? ' spawn' : '');
+    c.textContent = text; c.title = text;
+    c.addEventListener('pointerdown', e => startDrag(e, c));
+    if (spawn) c.addEventListener('animationend', () => c.classList.remove('spawn'), { once:true });
+    return c;
+  }
+  function refill(){
+    while (list.querySelectorAll('.a4-cap:not(.leaving)').length < MAX)
+      list.appendChild(makeCapsule(POOL[pi++ % POOL.length], true));
+  }
+  SEED.forEach(t => list.appendChild(makeCapsule(t, false)));
+
+  // ── drag ──
+  // The capsule is lifted OUT of the panel (re-parented to <body>, position:fixed)
+  // while dragging, so the panel's overflow:hidden can't clip it — it floats on top
+  // and you can carry it onto the bin, then release to drop it in. A placeholder
+  // keeps its slot open so the list doesn't jump while it's lifted away.
+  let drag = null;
+  function overBin(x, y){
+    const r = bin.getBoundingClientRect(), m = 12;   // a little forgiveness around the can
+    return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
+  }
+  function startDrag(e, cap){
+    if (e.button || cap.classList.contains('leaving')) return;   // primary button only
+    e.preventDefault();
+    const rect = cap.getBoundingClientRect();
+    const ph = document.createElement('div');                    // slot-holder
+    ph.className = 'a4-ph';
+    ph.style.height = rect.height + 'px';
+    ph.style.marginBottom = getComputedStyle(cap).marginBottom;
+    cap.parentNode.insertBefore(ph, cap);
+    document.body.appendChild(cap);                              // float above the clipped panel
+    cap.style.position = 'fixed';
+    cap.style.left  = rect.left + 'px';
+    cap.style.top   = rect.top + 'px';
+    cap.style.width = rect.width + 'px';
+    cap.style.margin = '0';
+    cap.classList.add('dragging');
+    drag = { cap, ph, sx:e.clientX, sy:e.clientY, over:false };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  }
+  function onMove(e){
+    if (!drag) return;
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+    drag.cap.style.transform = `translate(${dx}px, ${dy}px) scale(1.06) rotate(-1.5deg)`;
+    drag.over = overBin(e.clientX, e.clientY);
+    bin.classList.toggle('over', drag.over);
+  }
+  function onUp(){
+    if (!drag) return;
+    const { cap, ph, over } = drag;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+    bin.classList.remove('over');
+    cap.classList.remove('dragging');
+    drag = null;
+    if (over) toss(cap, ph);
+    else springBack(cap, ph);
+  }
+
+  // miss → glide back to the slot, then settle as a normal in-flow capsule again
+  function springBack(cap, ph){
+    void cap.offsetWidth;
+    cap.style.transition = 'transform .34s var(--spring)';
+    cap.style.transform = 'translate(0px, 0px)';
+    let done = false;
+    const land = () => {
+      if (done) return; done = true;
+      cap.removeEventListener('transitionend', land);
+      if (ph.parentNode) ph.parentNode.insertBefore(cap, ph);
+      ph.remove();
+      cap.removeAttribute('style');                 // drop the fixed positioning
+    };
+    cap.addEventListener('transitionend', land);
+    setTimeout(land, 420);                           // safety net
+  }
+
+  // hit → fly into the can, collapse the slot, tick the badge, refill
+  function toss(cap, ph){
+    cap.classList.add('leaving');
+    const ox = parseFloat(cap.style.left), oy = parseFloat(cap.style.top);
+    const w = cap.offsetWidth, h = cap.offsetHeight;
+    const br = bin.getBoundingClientRect();
+    const dx = (br.left + br.width / 2) - (ox + w / 2);
+    const dy = (br.top + br.height * 0.42) - (oy + h / 2);   // aim for the mouth of the can
+    void cap.offsetWidth;
+    cap.style.transition = 'transform .44s cubic-bezier(.5,.02,.8,.2), opacity .44s ease';
+    cap.style.transform = `translate(${dx}px, ${dy}px) scale(.14) rotate(10deg)`;
+    cap.style.opacity = '0';
+
+    // close the slot it left behind
+    ph.style.transition = 'height .34s var(--soft), margin .34s var(--soft)';
+    void ph.offsetWidth;
+    ph.style.height = '0';
+    ph.style.marginBottom = '0';
+    setTimeout(() => ph.remove(), 360);
+
+    bin.classList.remove('gulp'); void bin.offsetWidth; bin.classList.add('gulp');
+    automated++; badge.textContent = automated;
+    badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop');
+
+    refill();                                        // a fresh task slides in as this one flies away
+    let removed = false;
+    const drop = () => { if (removed) return; removed = true; cap.remove(); };
+    cap.addEventListener('transitionend', e => { if (e.propertyName === 'transform') drop(); });
+    setTimeout(drop, 700);                           // safety net if transitionend is missed
+  }
 })();
 </script>
 </body>
