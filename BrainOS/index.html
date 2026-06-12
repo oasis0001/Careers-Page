@@ -520,13 +520,6 @@
     color:#fff; white-space:nowrap; user-select:none; cursor:pointer; }
   .ctx-item:hover{ background:#2e2a2b; }
 
-  /* chrome fades away for a fully immersive reveal while the vault is shown */
-  #brand,#hint,#mind,#folderLinks{ transition:opacity .5s var(--ease-soft); }
-  body.vault-mode #brand,
-  body.vault-mode #hint,
-  body.vault-mode #mind,
-  body.vault-mode #folderLinks{ opacity:0 !important; pointer-events:none; }
-
   /* the hidden "Forbidden Vault" glass folder — composited from the Figma 2052:139 vector
      exports (frosted white-gradient glass) over a soft blue glow. Everything is sized off the
      --vw knob (folder width), so it scales as one piece. 152px = same width as the other folders. */
@@ -635,10 +628,9 @@
   function brainRelease(by){ _spinHolds.delete(by); if (!_spinHolds.size){ spinTarget = AUTO_ROTATE_SPEED; controls.enableRotate = true; } }  // resume spin + unlock
 
   // ── EASTER EGG: "FORBIDDEN VAULT" REVEAL ───────────────────────────
-  // Right-click → custom menu → fade out every panel + the HUD chrome, then spin the
-  // brain a half-turn to the BACK to reveal a hidden glass folder. Click away → reverse it.
+  // Right-click → custom menu → spin the brain to a side view and fade in a hidden glass
+  // folder. Nothing else is hidden — the HUD, folders and panels all stay. Click away → reverse it.
   let vaultState  = 'idle';     // 'idle' | 'entering' | 'shown' | 'exiting'
-  let vaultHidden = false;      // drives the per-frame fade of the 8 normal panels (see updatePanels)
   let vaultReveal = false;      // drives the per-frame fade of the vault panel itself
   let vaultEntry  = null;       // the anchored Forbidden Vault panel
   // ╔════════════════════════════════════════════════════════════════════╗
@@ -715,7 +707,7 @@
   function el(id){ return document.getElementById(id); }
 
   const threeCanvas = document.createElement('canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, alpha: true, antialias: false, preserveDrawingBuffer: true });   // AA is invisible after dithering — off = faster
   renderer.setPixelRatio(1); renderer.setClearColor(0x000000, 0);
 
   const scene = new THREE.Scene();
@@ -751,6 +743,15 @@
 
   let brainModel = null, baseDistance = 3, isBrainLoaded = false;
   let currentModelColor = inputs.modelColor.value;
+
+  // ── INTRO FLY-IN ─────────────────────────────────────────────────────
+  // On load the camera starts pulled back and dollies in, so the brain AND every panel/folder
+  // scale up together from small to full size — a "camera moving into the mind" zoom. The panels
+  // scale by 1/zoom so they track the brain's perspective exactly (no longer a fixed size).
+  const INTRO_ZOOM_START = 2.6;   // how far back it starts (×). higher = starts smaller / flies in further
+  const INTRO_DUR = 1.6;          // seconds
+  const intro = { active: true, t: 0 };
+  let introScale = 1 / INTRO_ZOOM_START;   // global multiplier on panel size; eases to 1
   let brainMesh = null, brainGeometry = null, brainMaterial = null;
   let modelRadius = 1;                     // max dimension — used to scale panel anchors
 
@@ -815,7 +816,7 @@
 
   const W = 1440, H = 750;
   displayCanvas.width = W; displayCanvas.height = H;
-  offscreenCanvas.width = W; offscreenCanvas.height = H;
+  // offscreenCanvas is sized small (one pixel per dither cell) inside drawDither — see PERF note there.
   renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
 
   function hexToRgb(hex) {
@@ -849,6 +850,18 @@
         controls.autoRotateSpeed = spinCur;
       }
       controls.update(dt);
+      if (intro.active && !camAnim.active) {
+        // INTRO FLY-IN: dolly the camera from INTRO_ZOOM_START× distance to 1×, easing out (decelerate
+        // to rest). The brain grows via perspective; introScale grows the panels at the same rate.
+        intro.t = Math.min(1, intro.t + dt / INTRO_DUR);
+        const e = 1 - Math.pow(1 - intro.t, 3);                 // easeOutCubic
+        const zoom = 1 + (INTRO_ZOOM_START - 1) * (1 - e);      // INTRO_ZOOM_START → 1
+        const tg = controls.target, off = camera.position.clone().sub(tg);
+        off.setLength(baseDistance * BRAIN_ZOOM * zoom);        // absolute radius → no compounding
+        camera.position.copy(tg).add(off);
+        introScale = 1 / zoom;                                  // panels track the brain's perspective
+        if (intro.t >= 1) { intro.active = false; introScale = 1; }
+      }
       updateLightRig();
       updatePanels(dt);                     // ← project the attached manifestations every frame
       renderer.render(scene, camera);
@@ -858,10 +871,7 @@
     if (now - lastDrawTime < 1000 / fps) return;
     lastDrawTime = now;
 
-    offCtx.clearRect(0, 0, W, H);
-    if (isBrainLoaded) offCtx.drawImage(threeCanvas, 0, 0, W, H);
-
-    drawDither();
+    drawDither();   // downsamples the 3D render + draws the ASCII (see PERF note inside)
   }
 
   function drawDither() {
@@ -883,12 +893,23 @@
     ctx.font = `bold ${res}px monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (!isBrainLoaded) return;
 
-    const pixels = offCtx.getImageData(0, 0, W, H).data;
-    for (let y = 0; y < H; y += res) {
-      for (let x = 0; x < W; x += res) {
-        const index = (y * W + x) * 4;
+    // PERF: downsample the 3D render to ONE pixel per dither cell, then read THAT.
+    // getImageData on a ~160×84 buffer is ~80× smaller than the full 1440×750 frame — it slashes
+    // both CPU and, critically, the ~4.3 MB of garbage we used to allocate every frame (the main
+    // source of GC stutter and the high memory reading). The dithered result is identical.
+    const dw = Math.ceil(W / res), dh = Math.ceil(H / res);
+    if (offscreenCanvas.width !== dw || offscreenCanvas.height !== dh) {
+      offscreenCanvas.width = dw; offscreenCanvas.height = dh; offCtx.imageSmoothingEnabled = false;
+    }
+    offCtx.clearRect(0, 0, dw, dh);
+    offCtx.drawImage(threeCanvas, 0, 0, W, H, 0, 0, dw, dh);   // GPU-fast downscale (nearest = point sample)
+    const pixels = offCtx.getImageData(0, 0, dw, dh).data;
+    for (let j = 0; j < dh; j++) {
+      for (let i = 0; i < dw; i++) {
+        const index = (j * dw + i) * 4;
         const r = pixels[index], g = pixels[index+1], b = pixels[index+2], a = pixels[index+3];
         if (a < 128) continue;
+        const x = i * res, y = j * res;
         // fill this brain cell solid + opaque → builds a solid silhouette occluder;
         // the dithered glyph is drawn on top of it below.
         ctx.fillStyle = "#000"; ctx.fillRect(x, y, res, res);
@@ -987,7 +1008,7 @@
       const depthScale = THREE.MathUtils.clamp(baseDistance / dist, 0.85, 1.12);
       p.el.style.left = sx + 'px';
       p.el.style.top  = sy + 'px';
-      p.el.style.transform = `translate(-50%,-50%) scale(${(depthScale * p.scale * PANEL_SCALE).toFixed(3)})`;
+      p.el.style.transform = `translate(-50%,-50%) scale(${(depthScale * p.scale * PANEL_SCALE * introScale).toFixed(3)})`;
       // OCCLUSION + DEPTH-SORT: z-index is a CONTINUOUS function of the panel's real
       // distance to the camera, with the brain canvas (z 10) as the divider plane.
       // A panel nearer than the brain centre lands above 10 (in front of the brain);
@@ -1005,11 +1026,10 @@
         p.el.style.pointerEvents = (vaultState === 'shown' && vaultReveal) ? 'auto' : 'none';
       } else {
         if (!p.skipOpacity) {
-          const target = vaultHidden ? 0 : onScreen;          // EASTER EGG: fade all panels out in vault mode
-          p.opacity += (target - p.opacity) * (vaultHidden ? 0.12 : 0.3);
+          p.opacity += (onScreen - p.opacity) * 0.3;
           p.el.style.opacity = p.opacity.toFixed(3);
         }
-        p.el.style.pointerEvents = (!vaultHidden && facing > 0.05 && onScreen) ? 'auto' : 'none';
+        p.el.style.pointerEvents = (facing > 0.05 && onScreen) ? 'auto' : 'none';
       }
     }
     drawFolderLinks(dt);
@@ -1358,7 +1378,7 @@
                 </div>
                 <div class="body">
                   <div class="h">AI Kitchen Co-Pilot</div>
-                  <img class="scene" src="assets/kitchenScene.png" width="772" height="464" alt="pixel kitchen" draggable="false">
+                  <img class="scene" src="assets/kitchenScene.webp" width="772" height="464" alt="pixel kitchen" draggable="false">
                   <div class="chat">
                     <div class="bub user">Cook something impressive using only paneer, two onions, and emotional damage.</div>
                     <div class="bub ai" data-ai-line>Okay. Pick an option from the list:</div>
@@ -1493,7 +1513,7 @@
                   <div class="a4-title">What all can be automated?</div>
                   <div class="a4-body">
                     <div class="a4-bin" aria-label="Boring Manual Work — trash">
-                      <img src="assets/automationTrash.png" alt="">
+                      <img src="assets/automationTrash.webp" alt="">
                       <span class="lbl">Boring Manual Work</span>
                       <span class="badge">12</span>
                     </div>
@@ -1863,22 +1883,22 @@
     return d;
   }
   const buildThingsAi      = () => {                              // opens Football Tracker + AI Kitchen Co-Pilot + Notes Editor 3
-    const d = mk('folder', `<img src="assets/thingsThatCouldBeAiFolder.png" alt="Things That Could Be AI" draggable="false"/>`);
+    const d = mk('folder', `<img src="assets/thingsThatCouldBeAiFolder.webp" alt="Things That Could Be AI" draggable="false"/>`);
     makeThingsAiPanels(d);
     return d;
   };
   const buildProductsBuild = () => {                              // opens To-do List + Notes Editor 2 (see makeProductsBuildPanels)
-    const d = mk('folder', `<img src="assets/productsToBuildFolder.png" alt="Products to Build" draggable="false"/>`);
+    const d = mk('folder', `<img src="assets/productsToBuildFolder.webp" alt="Products to Build" draggable="false"/>`);
     makeProductsBuildPanels(d);
     return d;
   };
   const buildAutomations   = () => {                              // opens Automation Flow + Notes Editor 4 (see makeAutomationsPanels)
-    const d = mk('folder', `<img src="assets/automationsFolder.png" alt="Automations" draggable="false"/>`);
+    const d = mk('folder', `<img src="assets/automationsFolder.webp" alt="Automations" draggable="false"/>`);
     makeAutomationsPanels(d);
     return d;
   };
   const buildIdeas2am      = () => {                              // opens the 3 real panels (see makeIdeas2amPanels)
-    const d = mk('folder', `<img src="assets/ideasAt2amFolder.png" alt="Ideas at 2 AM" draggable="false"/>`);
+    const d = mk('folder', `<img src="assets/ideasAt2amFolder.webp" alt="Ideas at 2 AM" draggable="false"/>`);
     makeIdeas2amPanels(d);
     return d;
   };
@@ -2060,9 +2080,7 @@
   function enterVault() {
     if (vaultState !== 'idle' || !isBrainLoaded) return;
     vaultState = 'entering';
-    document.body.classList.add('vault-mode');     // fade the HUD chrome + folder-link lines
-    vaultHidden = true;                            // fade the 8 panels out (driven in updatePanels)
-    brainHold('vault');                            // ease the idle spin to a stop + lock drag
+    brainHold('vault');                            // ease the idle spin to a stop + lock drag (nothing is hidden)
     vaultReturnAz = controls.getAzimuthalAngle();      // remember where to spin back to on dismiss
     vaultReturnPolar = controls.getPolarAngle();       // …and the vertical angle you were at
     setTimeout(() => {                             // …then turn to the side view and reveal the vault
@@ -2082,8 +2100,6 @@
     const cur = controls.getAzimuthalAngle();      // spin back to the original azimuth + vertical angle (shortest path)
     startCamTurn(cur + normalizeAngle(vaultReturnAz - cur), 2.0, () => {
       controls.autoRotate = true; controls.enableDamping = true;   // restore the live controls
-      document.body.classList.remove('vault-mode'); // fade the HUD chrome back in
-      vaultHidden = false;                           // fade the 8 panels back in
       brainRelease('vault');                         // resume idle spin + unlock drag
       vaultState = 'idle';
     }, vaultReturnPolar);                            // ease back to the vertical angle you were at
